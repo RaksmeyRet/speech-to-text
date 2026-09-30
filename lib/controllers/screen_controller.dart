@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'package:translator/translator.dart';
 
 class ScreenController extends GetxController {
   final SpeechToText _speechToText = SpeechToText();
@@ -10,6 +11,10 @@ class ScreenController extends GetxController {
   final lang = 'en'.obs; // 'en' or 'km'
   final localeId = 'en_US'.obs;
   final locales = <LocaleName>[].obs;
+  final _translator = GoogleTranslator();
+  final translatedText = ''.obs;
+  final isTranslating = false.obs;
+
 
   @override
   void onInit() {
@@ -49,6 +54,21 @@ class ScreenController extends GetxController {
     return null;
   }
 
+  Future<void> translateText(String text) async {
+    if (text.trim().isEmpty) return;
+    isTranslating.value = true;
+    try {
+      final from = lang.value;               // 'en' or 'km'
+      final to = from == 'en' ? 'km' : 'en'; // opposite language
+      final result = await _translator.translate(text, from: from, to: to);
+      translatedText.value = result.text;
+    } catch (e) {
+      translatedText.value = 'Translation failed. Check internet.';
+    } finally {
+      isTranslating.value = false;
+    }
+  }
+
   Future<void> _listen() async {
     isListening.value = true;
     await _speechToText.listen(
@@ -59,12 +79,18 @@ class ScreenController extends GetxController {
       ),
       onResult: (result) {
         text.value = result.recognizedWords;
+        if (result.finalResult) {
+          translateText(result.recognizedWords);
+        }
       },
     );
   }
 
   Future<void> start() async {
     if (isListening.value) return;
+
+    text.value = '';
+    translatedText.value = '';
 
     if (!isAvailable.value) {
       Get.snackbar(
@@ -102,6 +128,7 @@ class ScreenController extends GetxController {
 
   Future<void> setLanguage(String code) async {
     if (isListening.value) await stop();
+    translatedText.value = '';
 
     final id = _findLocale(code);
     if (id == null) {

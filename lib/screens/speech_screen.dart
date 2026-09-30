@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/screen_controller.dart';
 import '../widgets/language_selector.dart';
+import '../widgets/translation.dart';
 
 class SpeechScreen extends StatelessWidget {
   const SpeechScreen({super.key});
@@ -34,28 +35,38 @@ class SpeechScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 20),
-              Obx(() {
-                final recognizedText = c.text.value;
-                final message = c.isListening.value
-                    ? (recognizedText.isEmpty ? 'Listening...' : recognizedText)
-                    : (recognizedText.isEmpty
-                          ? 'Tap the mic button to\nstart'
-                          : recognizedText);
+              Expanded(
+                child: Obx(() {
+                  final sourceLanguage = c.lang.value;
+                  final targetLanguage = sourceLanguage == 'en' ? 'km' : 'en';
+                  final sourceLabel = sourceLanguage == 'en'
+                      ? 'English'
+                      : 'Khmer';
+                  final targetLabel = targetLanguage == 'en'
+                      ? 'English'
+                      : 'Khmer';
+                  final sourceText = c.text.value.isNotEmpty
+                      ? c.text.value
+                      : c.isListening.value
+                      ? 'Listening...'
+                      : 'Spoken words will appear here';
+                  final targetText = c.isTranslating.value
+                      ? 'Translating...'
+                      : c.translatedText.value.isNotEmpty
+                      ? c.translatedText.value
+                      : 'Translation will appear here';
 
-                return Text(
-                  message,
-                  maxLines: 5,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 30,
-                    height: 1.1,
-                    fontWeight: FontWeight.w300,
-                  ),
-                );
-              }),
+                  return ListView(
+                    padding: EdgeInsets.zero,
+                    children: [
+                      TranslationPanel(label: sourceLabel, text: sourceText),
+                      const SizedBox(height: 12),
+                      TranslationPanel(label: targetLabel, text: targetText),
+                    ],
+                  );
+                }),
+              ),
               const SizedBox(height: 18),
-              const Spacer(),
               Obx(() {
                 final sourceCode = c.lang.value;
                 final targetCode = sourceCode == 'en' ? 'km' : 'en';
