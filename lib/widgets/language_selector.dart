@@ -28,7 +28,7 @@ class LanguageSelector extends StatelessWidget {
             color: selected ? const Color(0xFFBACCF5) : Colors.white12,
           ),
         ),
-        child: Text(
+        child: Text(   
           label,
           style: TextStyle(
             color: selected ? const Color(0xFF1B1D22) : Colors.white70,

@@ -11,7 +11,7 @@ class ScreenController extends GetxController {
   final lang = 'en'.obs; // 'en' or 'km'
   final localeId = 'en_US'.obs;
   final locales = <LocaleName>[].obs;
-  final _translator = GoogleTranslator();
+  final _translator = GoogleTranslator(); // make variable for call from package translator
   final translatedText = ''.obs;
   final isTranslating = false.obs;
 
@@ -22,6 +22,7 @@ class ScreenController extends GetxController {
     _init();
   }
 
+  // method to initialize speech recognition and set up locales
   Future<void> _init() async {
     final ok = await _speechToText.initialize(
       onStatus: (status) {
@@ -37,12 +38,7 @@ class ScreenController extends GetxController {
     isAvailable.value = ok;
     if (ok) {
       locales.assignAll(await _speechToText.locales());
-      final en = _findLocale('en');
-      if (en != null) {
-        localeId.value = en;
-      } else {
-        localeId.value = 'en_US';
-      }
+      localeId.value = _findLocale('en') ?? 'en_US';
       lang.value = 'en';
     }
   }
@@ -59,7 +55,7 @@ class ScreenController extends GetxController {
     isTranslating.value = true;
     try {
       final from = lang.value;               // 'en' or 'km'
-      final to = from == 'en' ? 'km' : 'en'; // opposite language
+      final to = from == 'en' ? 'km' : 'en'; // opposite language    
       final result = await _translator.translate(text, from: from, to: to);
       translatedText.value = result.text;
     } catch (e) {
@@ -85,7 +81,7 @@ class ScreenController extends GetxController {
       },
     );
   }
-
+ 
   Future<void> start() async {
     if (isListening.value) return;
 
