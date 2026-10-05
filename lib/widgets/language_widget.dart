@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class LanguageSelector extends StatelessWidget {
-  const LanguageSelector({
+class LanguageWidget extends StatelessWidget {
+  const LanguageWidget({
     super.key,
     required this.label,
     required this.selected,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class TranslationPanel extends StatelessWidget {
-  const TranslationPanel({super.key, required this.label, required this.text});
+class TranslationWidget extends StatelessWidget {
+  const TranslationWidget({super.key, required this.label, required this.text});
 
   final String label;
   final String text;

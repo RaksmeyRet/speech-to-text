@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/screen_controller.dart';
-import '../widgets/language_selector.dart';
-import '../widgets/translation.dart';
+import '../widgets/language_widget.dart';
+import '../widgets/translation_widget.dart';
 
 class SpeechScreen extends StatelessWidget {
   const SpeechScreen({super.key});
@@ -59,9 +59,9 @@ class SpeechScreen extends StatelessWidget {
                   return ListView(
                     padding: EdgeInsets.zero,
                     children: [
-                      TranslationPanel(label: sourceLabel, text: sourceText),
+                      TranslationWidget(label: sourceLabel, text: sourceText),
                       const SizedBox(height: 12),
-                      TranslationPanel(label: targetLabel, text: targetText),
+                      TranslationWidget(label: targetLabel, text: targetText),
                     ],
                   );
                 }),
@@ -76,7 +76,7 @@ class SpeechScreen extends StatelessWidget {
                 return Row(
                   children: [
                     Expanded(
-                      child: LanguageSelector(
+                      child: LanguageWidget(
                         label: sourceLabel,
                         selected: true,
                         onTap: () => c.setLanguage(sourceCode),
@@ -91,7 +91,7 @@ class SpeechScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: LanguageSelector(
+                      child: LanguageWidget(
                         label: targetLabel,
                         selected: false,
                         onTap: () => c.setLanguage(targetCode),
