@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:translator/translator.dart';
@@ -5,16 +7,29 @@ import 'package:translator/translator.dart';
 class ScreenController extends GetxController {
   final SpeechToText _speechToText = SpeechToText();
 
+  final isTextMode = false.obs;
+
+  // Speak mode: Khmer -> English only
+  final lang = 'km'.obs;
+
+  // Type mode: any language
+  final textFrom = 'en'.obs;
+  final textTo = 'km'.obs;
+
+  final inputController = TextEditingController();
+  Timer? _debounce;
+
   final isAvailable = false.obs;
   final isListening = false.obs;
   final text = ''.obs;
-  final lang = 'en'.obs; // 'en' or 'km'
-  final localeId = 'en_US'.obs;
+  final localeId = 'km_KH'.obs;
   final locales = <LocaleName>[].obs;
-  final _translator = GoogleTranslator(); // make variable for call from package translator
+  final _translator = GoogleTranslator();
   final translatedText = ''.obs;
   final isTranslating = false.obs;
 
+  String get sourceCode => isTextMode.value ? textFrom.value : lang.value;
+  String get targetCode => isTextMode.value ? textTo.value : 'en';
 
   @override
   void onInit() {
@@ -22,7 +37,6 @@ class ScreenController extends GetxController {
     _init();
   }
 
-  // method to initialize speech recognition and set up locales
   Future<void> _init() async {
     final ok = await _speechToText.initialize(
       onStatus: (status) {
@@ -38,8 +52,8 @@ class ScreenController extends GetxController {
     isAvailable.value = ok;
     if (ok) {
       locales.assignAll(await _speechToText.locales());
-      localeId.value = _findLocale('en') ?? 'en_US';
-      lang.value = 'en';
+      localeId.value = _findLocale('km') ?? 'km_KH';
+      lang.value = 'km';
     }
   }
 
@@ -54,9 +68,11 @@ class ScreenController extends GetxController {
     if (text.trim().isEmpty) return;
     isTranslating.value = true;
     try {
-      final from = lang.value;               // 'en' or 'km'
-      final to = from == 'en' ? 'km' : 'en'; // opposite language    
-      final result = await _translator.translate(text, from: from, to: to);
+      final result = await _translator.translate(
+        text,
+        from: sourceCode,
+        to: targetCode,
+      );
       translatedText.value = result.text;
     } catch (e) {
       translatedText.value = 'Translation failed. Check internet.';
@@ -65,6 +81,17 @@ class ScreenController extends GetxController {
     }
   }
 
+  // ---------- Mode ----------
+  Future<void> setMode(bool textMode) async {
+    if (isListening.value) await stop();
+    _debounce?.cancel();
+    inputController.clear();
+    text.value = '';
+    translatedText.value = '';
+    isTextMode.value = textMode;
+  }
+
+  // ---------- Speak mode ----------
   Future<void> _listen() async {
     isListening.value = true;
     await _speechToText.listen(
@@ -81,7 +108,7 @@ class ScreenController extends GetxController {
       },
     );
   }
- 
+
   Future<void> start() async {
     if (isListening.value) return;
 
@@ -122,32 +149,55 @@ class ScreenController extends GetxController {
     }
   }
 
-  Future<void> setLanguage(String code) async {
-    if (isListening.value) await stop();
-    translatedText.value = '';
-
-    final id = _findLocale(code);
-    if (id == null) {
-      if (locales.isNotEmpty) {
-        Get.snackbar(
-          'Not supported',
-          'This language is not available on your phone',
-        );
-        return;
-      }
-
-      localeId.value = code == 'km' ? 'km_KH' : 'en_US';
-      lang.value = code;
+  // ---------- Type mode ----------
+  void onTyped(String v) {
+    _debounce?.cancel();
+    if (v.trim().isEmpty) {
+      text.value = '';
+      translatedText.value = '';
       return;
     }
+    _debounce = Timer(const Duration(milliseconds: 700), () {
+      text.value = v;
+      translateText(v);
+    });
+  }
 
-    localeId.value = id;
-    lang.value = code;
+  void _retranslate() {
+    final v = inputController.text;
+    if (v.trim().isEmpty) {
+      translatedText.value = '';
+    } else {
+      translateText(v);
+    }
+  }
+
+  void setTextFrom(String code) {
+    if (code == textTo.value) textTo.value = textFrom.value;
+    textFrom.value = code;
+    _retranslate();
+  }
+
+  void setTextTo(String code) {
+    if (code == textFrom.value) textFrom.value = textTo.value;
+    textTo.value = code;
+    _retranslate();
+  }
+
+  // swap works in Type mode only
+  Future<void> swap() async {
+    if (!isTextMode.value) return;
+    final old = textFrom.value;
+    textFrom.value = textTo.value;
+    textTo.value = old;
+    _retranslate();
   }
 
   @override
   void onClose() {
+    _debounce?.cancel();
     _speechToText.cancel();
+    inputController.dispose();
     super.onClose();
   }
 }

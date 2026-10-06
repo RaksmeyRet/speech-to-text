@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/screen_controller.dart';
+import '../models/languages.dart';
+import '../widgets/language_picker.dart';
 import '../widgets/language_widget.dart';
+import '../widgets/mic_button.dart';
 import '../widgets/translation_widget.dart';
+import '../widgets/type_box.dart';
 
 class SpeechScreen extends StatelessWidget {
   const SpeechScreen({super.key});
@@ -20,31 +24,49 @@ class SpeechScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Spacer(),
-                  const Text(
-                    'Home',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 34,
-                      fontWeight: FontWeight.w700,
-                    ),
+              const Center(
+                child: Text(
+                  'Home',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 34,
+                    fontWeight: FontWeight.w700,
                   ),
-                  const Spacer(),
-                ],
+                ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
+
+              // Mode switch
+              Obx(
+                () => Row(
+                  children: [
+                    Expanded(
+                      child: LanguageWidget(
+                        label: 'Speak',
+                        selected: !c.isTextMode.value,
+                        onTap: () => c.setMode(false),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: LanguageWidget(
+                        label: 'Type',
+                        selected: c.isTextMode.value,
+                        onTap: () => c.setMode(true),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Text boxes
               Expanded(
                 child: Obx(() {
-                  final sourceLanguage = c.lang.value;
-                  final targetLanguage = sourceLanguage == 'en' ? 'km' : 'en';
-                  final sourceLabel = sourceLanguage == 'en'
-                      ? 'English'
-                      : 'Khmer';
-                  final targetLabel = targetLanguage == 'en'
-                      ? 'English'
-                      : 'Khmer';
+                  final sourceLabel = appLanguages[c.sourceCode]!;
+                  final targetLabel = appLanguages[c.targetCode]!;
+                  final typeMode = c.isTextMode.value;
+
                   final sourceText = c.text.value.isNotEmpty
                       ? c.text.value
                       : c.isListening.value
@@ -59,7 +81,12 @@ class SpeechScreen extends StatelessWidget {
                   return ListView(
                     padding: EdgeInsets.zero,
                     children: [
-                      TranslationWidget(label: sourceLabel, text: sourceText),
+                      typeMode
+                          ? TypeBox(label: sourceLabel, controller: c)
+                          : TranslationWidget(
+                              label: sourceLabel,
+                              text: sourceText,
+                            ),
                       const SizedBox(height: 12),
                       TranslationWidget(label: targetLabel, text: targetText),
                     ],
@@ -67,73 +94,62 @@ class SpeechScreen extends StatelessWidget {
                 }),
               ),
               const SizedBox(height: 18),
-              Obx(() {
-                final sourceCode = c.lang.value;
-                final targetCode = sourceCode == 'en' ? 'km' : 'en';
-                final sourceLabel = sourceCode == 'en' ? 'English' : 'Khmer';
-                final targetLabel = targetCode == 'en' ? 'English' : 'Khmer';
 
-                return Row(
+              // Bottom controls
+              Obx(() {
+                final sourceLabel = appLanguages[c.sourceCode]!;
+                final targetLabel = appLanguages[c.targetCode]!;
+                final typeMode = c.isTextMode.value;
+
+                return Column(
                   children: [
-                    Expanded(
-                      child: LanguageWidget(
-                        label: sourceLabel,
-                        selected: true,
-                        onTap: () => c.setLanguage(sourceCode),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: LanguageWidget(
+                            label: sourceLabel,
+                            selected: true,
+                            onTap: typeMode
+                                ? () => showLanguagePicker(
+                                    context,
+                                    c.textFrom.value,
+                                    c.setTextFrom,
+                                  )
+                                : () {},
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          tooltip: 'Switch language direction',
+                          onPressed: typeMode ? c.swap : null,
+                          icon: const Icon(Icons.swap_horiz),
+                          color: Colors.white70,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: LanguageWidget(
+                            label: targetLabel,
+                            selected: false,
+                            onTap: typeMode
+                                ? () => showLanguagePicker(
+                                    context,
+                                    c.textTo.value,
+                                    c.setTextTo,
+                                  )
+                                : () {},
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (!typeMode)
+                      MicButton(
+                        isListening: c.isListening.value,
+                        onTap: c.toggle,
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      tooltip: 'Switch language direction',
-                      onPressed: () => c.setLanguage(targetCode),
-                      icon: const Icon(Icons.swap_horiz),
-                      color: Colors.white70,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: LanguageWidget(
-                        label: targetLabel,
-                        selected: false,
-                        onTap: () => c.setLanguage(targetCode),
-                      ),
-                    ),
                   ],
                 );
               }),
-              const SizedBox(height: 12),
-              Obx(
-                () => Center(
-                  child: Semantics(
-                    button: true,
-                    label: c.isListening.value
-                        ? 'Stop recording'
-                        : 'Start recording',
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: c.toggle,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: c.isListening.value
-                                ? const Color(0xFFFF7777)
-                                : const Color(0xFFBACCF5),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            c.isListening.value ? Icons.stop : Icons.mic,
-                            size: 34,
-                            color: const Color(0xFF1B1D22),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
               const SizedBox(height: 16),
             ],
           ),
