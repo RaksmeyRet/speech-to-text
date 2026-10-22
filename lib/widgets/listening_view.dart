@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../constants/app_constants.dart';
-import '../constants/app_languages.dart';
 import '../controllers/chat_controller.dart';
 
 class ListeningView extends StatelessWidget {
@@ -37,17 +36,23 @@ class ListeningView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          Obx(() => Text(
-                'Listening in ${appLanguages[c.selectedLang.value] ?? ''}…',
-                style: const TextStyle(
-                    fontSize: 17, fontWeight: FontWeight.w600),
-              )),
+          Obx(
+            () => Text(
+              AppStrings.listening(c.selectedLang.value),
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+            ),
+          ),
           const SizedBox(height: 10),
-          const Text(
-            'Speak now. Your words are translated to English when you stop.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                fontSize: 14, height: 1.4, color: Color(0xFF4A5651)),
+          Obx(
+            () => Text(
+              AppStrings.listeningHint(c.selectedLang.value),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                height: 1.5,
+                color: Color(0xFF4A5651),
+              ),
+            ),
           ),
         ],
       ),

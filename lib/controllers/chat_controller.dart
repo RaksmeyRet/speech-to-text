@@ -1,5 +1,4 @@
-import 'dart:convert';
-
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -9,7 +8,8 @@ import 'package:translator/translator.dart';
 import '../constants/app_constants.dart';
 import '../constants/app_languages.dart';
 import '../models/chat_message.dart';
-import '../models/video_segment.dart';
+import '../models/knowledge_document.dart';
+import '../services/knowledge_api.dart';
 
 class ChatController extends GetxController {
   // ---------- State ----------
@@ -20,14 +20,25 @@ class ChatController extends GetxController {
   final hasText = false.obs;
   final selectedLang = defaultLanguage.obs;
   final originalText = ''.obs;
+  final selectedAudioFileName = Rxn<String>();
 
   // ---------- Helpers ----------
   final inputController = TextEditingController();
   final scrollController = ScrollController();
   final _speech = SpeechToText();
   final _translator = GoogleTranslator();
-  final _segments = <VideoSegment>[];
+  final KnowledgeApi _knowledgeApi;
+  late final Future<String> Function(String text) _translateKhmer;
+  PlatformFile? _selectedAudioFile;
   bool _speechReady = false;
+  String? _greetingMessageId;
+
+  ChatController({
+    KnowledgeApi? knowledgeApi,
+    Future<String> Function(String text)? translateKhmer,
+  }) : _knowledgeApi = knowledgeApi ?? KnowledgeApi() {
+    _translateKhmer = translateKhmer ?? _translateWithGoogle;
+  }
 
   // ---------- Lifecycle ----------
   @override
@@ -36,9 +47,12 @@ class ChatController extends GetxController {
     inputController.addListener(
       () => hasText.value = inputController.text.trim().isNotEmpty,
     );
-    messages.add(ChatMessage.bot(AppStrings.greeting));
+    final greeting = ChatMessage.bot(
+      AppStrings.greetingFor(selectedLang.value),
+    );
+    messages.add(greeting);
+    _greetingMessageId = greeting.id;
     _initSpeech();
-    _loadSegments();
   }
 
   @override
@@ -46,6 +60,7 @@ class ChatController extends GetxController {
     inputController.dispose();
     scrollController.dispose();
     _speech.cancel();
+    _knowledgeApi.close();
     super.onClose();
   }
 
@@ -58,24 +73,53 @@ class ChatController extends GetxController {
     );
   }
 
-  Future<void> _loadSegments() async {
-    try {
-      final raw = await rootBundle.loadString(AppConfig.segmentsAsset);
-      _segments.addAll(
-        (jsonDecode(raw) as List).map(
-          (e) => VideoSegment.fromJson(e as Map<String, dynamic>),
-        ),
-      );
-    } catch (_) {
-      // no segments file: replies fall back to the dummy text
-    }
-  }
-
   // ---------- Language ----------
   void setLanguage(String code) {
     if (isListening.value) return; // locked while recording
     selectedLang.value = code;
+    final greetingIndex = messages.indexWhere(
+      (message) => message.id == _greetingMessageId,
+    );
+    if (greetingIndex >= 0) {
+      final greeting = ChatMessage.bot(AppStrings.greetingFor(code));
+      messages[greetingIndex] = greeting;
+      _greetingMessageId = greeting.id;
+    }
   }
+
+  // ---------- Audio file ----------
+  Future<void> pickAudioFile() async {
+    try {
+      final files = await FilePicker.pickFiles(type: FileType.audio);
+      if (files.isNotEmpty) {
+        final file = files.first;
+        final size = await file.length();
+        if (size == null || size <= 0) {
+          Get.snackbar(
+            'Invalid audio',
+            'The selected file is empty or unreadable.',
+          );
+          return;
+        }
+        if (size > 25 * 1024 * 1024) {
+          Get.snackbar('Audio too large', 'Choose an audio file up to 25 MB.');
+          return;
+        }
+        _selectedAudioFile = file;
+        selectedAudioFileName.value = file.name;
+      }
+    } on PlatformException catch (error) {
+      Get.snackbar('File selection failed', error.message ?? error.code);
+    }
+  }
+
+  void clearSelectedAudioFile() {
+    _selectedAudioFile = null;
+    selectedAudioFileName.value = null;
+  }
+
+  Future<KnowledgeDocument> loadKnowledge(String id) =>
+      _knowledgeApi.getKnowledge(id);
 
   // ---------- Voice: speak -> translate to English -> fill input ----------
   Future<void> toggleListening() async {
@@ -112,12 +156,7 @@ class ChatController extends GetxController {
 
     isTranslating.value = true;
     try {
-      final result = await _translator.translate(
-        text,
-        from: selectedLang.value,
-        to: 'en',
-      );
-      _setInput(result.text);
+      _setInput(await _toEnglish(text));
     } catch (_) {
       Get.snackbar('Translation failed', 'Check your internet and try again.');
     } finally {
@@ -135,84 +174,124 @@ class ChatController extends GetxController {
   // ---------- Send ----------
   Future<void> send() async {
     final text = inputController.text.trim();
-    if (text.isEmpty || isTyping.value || isTranslating.value) return;
+    if (isTyping.value || isTranslating.value) return;
+
+    if (text.isEmpty) {
+      // only an audio file was chosen: there is no transcription endpoint yet
+      if (_selectedAudioFile != null) {
+        Get.snackbar(
+          'Audio transcription unavailable',
+          'Use the microphone to speak your question, or type it here.',
+        );
+      }
+      return;
+    }
     if (isListening.value) {
       await _speech.stop();
       isListening.value = false;
     }
 
     final spoken = originalText.value.trim(); // set when the user used voice
-    inputController.clear();
-    originalText.value = '';
     isTyping.value = true;
 
-    String english = text;
-    String? original = spoken.isNotEmpty ? spoken : null;
-
-     // Typed text: auto-detect the language and translate to English
-    if (original == null) {
-      try {
-        final r = await _translator.translate(text, to: 'en');
-        if (r.sourceLanguage.code != 'en') {
-          english = r.text;
-          original = text;
-        }
-      } catch (_) {
-        // offline: keep the text as typed
-      }
-    }
-    _add(ChatMessage.user(english, original: original));
-
     try {
+      late final String english;
+      String? original;
+      if (_containsKhmer(text)) {
+        english = await _toEnglish(text);
+        original = text;
+      } else {
+        english = text;
+        original = _containsKhmer(spoken) ? spoken : null;
+      }
+
+      inputController.clear();
+      originalText.value = '';
+      clearSelectedAudioFile();
+      _add(ChatMessage.user(english, original: original));
       _add(await _fetchReply(english));
-    } catch (_) {
+    } on QuestionTranslationException catch (error) {
+      Get.snackbar('Translation failed', error.message);
+    } on KnowledgeApiException catch (error) {
       _add(ChatMessage.bot(AppStrings.error));
+      Get.snackbar('Search failed', error.message);
+    } catch (error) {
+      _add(ChatMessage.bot(AppStrings.error));
+      Get.snackbar('Search failed', error.toString());
     } finally {
       isTyping.value = false;
     }
   }
 
-  // ---------- Reply (dummy now; replace with Django later) ----------
-  Future<ChatMessage> _fetchReply(String question) async {
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    final found = _matchMany(question);
-    if (found.isEmpty) {
-      return ChatMessage.bot('This is a dummy reply to: "$question"');
+  Future<String> _toEnglish(String text) async {
+    if (!_containsKhmer(text)) return text;
+    try {
+      final translated = await _translateKhmer(text);
+      if (translated.trim().isEmpty) {
+        throw const QuestionTranslationException(
+          'No English translation was returned.',
+        );
+      }
+      return translated.trim();
+    } catch (error) {
+      if (error is QuestionTranslationException) rethrow;
+      throw QuestionTranslationException(error.toString());
     }
-
-    final text = found.length == 1
-        ? found.first.summary
-        : 'I found ${found.length} clips that can help:';
-    return ChatMessage.bot(
-      text,
-      videoUrl: AppConfig.demoVideoUrl,
-      segments: found,
-    );
   }
 
-  List<VideoSegment> _matchMany(String question) {
-    final words = question
-        .toLowerCase()
-        .split(RegExp(r'[^a-z0-9]+'))
-        .where((w) => w.length > 2 && !AppConfig.stopWords.contains(w))
-        .toSet();
+  Future<String> _translateWithGoogle(String text) async =>
+      (await _translator.translate(text, from: 'km', to: 'en')).text;
 
-    final scored = <MapEntry<VideoSegment, int>>[];
-    for (final s in _segments) {
-      final searchText = [
-        s.title,
-        ...s.keywords,
-        ...s.possibleQuestions,
-      ].join(' ').toLowerCase();
-      final score = words.where(searchText.contains).length;
-      if (score > 0) scored.add(MapEntry(s, score));
+  bool _containsKhmer(String text) => RegExp(r'[\u1780-\u17FF]').hasMatch(text);
+
+  // ---------- Knowledge search ----------
+  Future<ChatMessage> _fetchReply(String question) async {
+    final overview = await _knowledgeApi.searchOverview(
+      question: question,
+      language: selectedLang.value,
+    );
+    final results = overview.results;
+    if (results.isEmpty) return ChatMessage.bot(AppStrings.noResult);
+
+    final summary = overview.summary?.trim() ?? '';
+    final steps = overview.steps
+        .map((step) {
+          final title = step.title.trim();
+          final instruction = step.instruction.trim();
+          final content = [
+            title,
+            instruction,
+          ].where((part) => part.isNotEmpty).join(': ');
+          return content.isEmpty ? '' : '${step.stepNumber}. $content';
+        })
+        .where((step) => step.isNotEmpty)
+        .join('\n');
+    final answer = [
+      summary,
+      steps,
+    ].where((part) => part.isNotEmpty).join('\n\n');
+    if (answer.isNotEmpty) {
+      return ChatMessage.bot(answer, searchResults: results);
     }
-    scored.sort((a, b) => b.value.compareTo(a.value));
-    return scored
-        .take(AppConfig.maxSegmentsPerAnswer)
-        .map((e) => e.key)
+
+    final answers = results
+        .map((result) {
+          final summary = result.summary.trim();
+          final transcript = result.transcript.trim();
+          final title = result.title.trim().isNotEmpty
+              ? result.title.trim()
+              : result.knowledgeTitle.trim();
+          final content = summary.isNotEmpty ? summary : transcript;
+
+          if (content.isEmpty) return title;
+          if (results.length == 1 || title.isEmpty) return content;
+          return '$title: $content';
+        })
+        .where((answer) => answer.isNotEmpty)
         .toList();
+
+    if (answers.isEmpty) return ChatMessage.bot(AppStrings.noResult);
+    return ChatMessage.bot(answers.join('\n\n'), searchResults: results);
   }
 
   // ---------- Scroll ----------
@@ -227,4 +306,13 @@ class ChatController extends GetxController {
       );
     });
   }
+}
+
+class QuestionTranslationException implements Exception {
+  final String message;
+
+  const QuestionTranslationException(this.message);
+
+  @override
+  String toString() => message;
 }

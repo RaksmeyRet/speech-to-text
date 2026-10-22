@@ -1,30 +1,36 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'package:get/get.dart';
+import 'package:speech_to_text_app/constants/app_constants.dart';
+import 'package:speech_to_text_app/constants/app_languages.dart';
+import 'package:speech_to_text_app/controllers/chat_controller.dart';
 import 'package:speech_to_text_app/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  test('only Khmer and English are available', () {
+    expect(appLanguages.keys.toSet(), {'en', 'km'});
+  });
+
+  testWidgets('chat title follows the selected language', (tester) async {
     await tester.pumpWidget(const MyApp());
-
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('ខេមរាបុត្រ'), findsOneWidget);
+    expect(find.text(AppStrings.greetingKhmer), findsOneWidget);
+    expect(find.byTooltip('Add knowledge'), findsNothing);
+    expect(find.byTooltip('Select a voice file'), findsOneWidget);
+    expect(find.byIcon(Icons.mic), findsOneWidget);
+
+    final controller = Get.find<ChatController>();
+    controller.setLanguage('en');
+    await tester.pump();
+
+    expect(find.text('Khemra bot'), findsOneWidget);
+    expect(find.text(AppStrings.greeting), findsOneWidget);
+
+    controller.setLanguage('km');
+    await tester.pump();
+
+    expect(find.text(AppStrings.greetingKhmer), findsOneWidget);
   });
 }

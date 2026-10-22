@@ -12,7 +12,10 @@ class YouSaidStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(() {
       if (c.originalText.isEmpty) return const SizedBox.shrink();
-      final lang = (appLanguages[c.selectedLang.value] ?? '').toUpperCase();
+      final code = c.selectedLang.value;
+      final label =
+          '${AppStrings.youSaid(code)} · ${appLanguages[code] ?? ''}'
+              .toUpperCase();
 
       return Container(
         width: double.infinity,
@@ -28,7 +31,7 @@ class YouSaidStrip extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'YOU SAID · $lang',
+                  label,
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -37,13 +40,17 @@ class YouSaidStrip extends StatelessWidget {
                   ),
                 ),
                 if (c.isTranslating.value)
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.refresh, size: 14, color: AppColors.primary),
-                      SizedBox(width: 6),
+                      const Icon(
+                        Icons.refresh,
+                        size: 14,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 6),
                       Text(
-                        'Translating',
-                        style: TextStyle(
+                        AppStrings.translating(code),
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: AppColors.primary,

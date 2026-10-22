@@ -11,23 +11,31 @@ class AppColors {
 
 class AppStrings {
   static const greeting =
-      'Hi! Ask me anything about your videos. You can type or use the mic.';
-  static const noResult = "Sorry, I couldn't find a clip for that. Try rephrasing.";
+      'Hi! Ask me anything about apps. '
+      'You can type, speak, or upload a voice file.';
+  static const greetingKhmer =
+      'សួស្តី! អ្នកអាចសួរខ្ញុំអំពីកម្មវិធីបានគ្រប់ពេល។ '
+      'អ្នកអាចវាយ សួរដោយសំឡេង ឬផ្ទុកឡើងឯកសារសំឡេង។';
+  static const noResult =
+      "Sorry, I couldn't find an answer for that. Try rephrasing.";
   static const error = 'Sorry, something went wrong. Please try again.';
   static const inputHint = 'Type or tap the mic…';
-}
 
-class AppConfig {
-  // Dummy video until the backend returns a real video_url
-  static const demoVideoUrl =
-      'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4';
+  static String greetingFor(String languageCode) =>
+      languageCode == 'km' ? greetingKhmer : greeting;
 
-  static const segmentsAsset = 'assets/segments.json';
-  static const maxSegmentsPerAnswer = 3;
+  // ---------- recording screen ----------
+  static String listening(String languageCode) => languageCode == 'km'
+      ? 'កំពុងស្តាប់ជាភាសាខ្មែរ…'
+      : 'Listening in English…';
 
-  // Words ignored by the dummy keyword matcher
-  static const stopWords = {
-    'how', 'what', 'where', 'the', 'can', 'for', 'and', 'you',
-    'does', 'need', 'why', 'are', 'with', 'this', 'that', 'use', 'do',
-  };
+  static String listeningHint(String languageCode) => languageCode == 'km'
+      ? 'និយាយឥឡូវនេះ។ ពាក្យរបស់អ្នកនឹងត្រូវបកប្រែជាភាសាអង់គ្លេសនៅពេលអ្នកឈប់។'
+      : 'Speak now. Your words are translated to English when you stop.';
+
+  static String youSaid(String languageCode) =>
+      languageCode == 'km' ? 'អ្នកបាននិយាយ' : 'YOU SAID';
+
+  static String translating(String languageCode) =>
+      languageCode == 'km' ? 'កំពុងបកប្រែ' : 'Translating';
 }
