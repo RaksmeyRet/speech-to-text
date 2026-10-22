@@ -67,7 +67,10 @@ class ChatController extends GetxController {
   Future<void> _initSpeech() async {
     _speechReady = await _speech.initialize(
       onStatus: (s) {
-        if (s == 'done' || s == 'notListening') isListening.value = false;
+        if (s == 'done' || s == 'notListening') {
+          isListening.value = false;
+          _handleSpeechFinished();
+        }
       },
       onError: (_) => isListening.value = false,
     );
@@ -130,6 +133,7 @@ class ChatController extends GetxController {
     if (isListening.value) {
       await _speech.stop();
       isListening.value = false;
+      _handleSpeechFinished();
       return;
     }
 
@@ -144,6 +148,13 @@ class ChatController extends GetxController {
         if (r.finalResult) _translateToEnglish(r.recognizedWords);
       },
     );
+  }
+
+  void _handleSpeechFinished() {
+    final text = originalText.value.trim();
+    if (text.isNotEmpty && inputController.text.trim().isEmpty) {
+      _translateToEnglish(text);
+    }
   }
 
   Future<void> _translateToEnglish(String text) async {
@@ -271,7 +282,11 @@ class ChatController extends GetxController {
       steps,
     ].where((part) => part.isNotEmpty).join('\n\n');
     if (answer.isNotEmpty) {
-      return ChatMessage.bot(answer, searchResults: results);
+      return ChatMessage.bot(
+        answer,
+        overview: overview,
+        searchResults: results,
+      );
     }
 
     final answers = results
@@ -291,7 +306,11 @@ class ChatController extends GetxController {
         .toList();
 
     if (answers.isEmpty) return ChatMessage.bot(AppStrings.noResult);
-    return ChatMessage.bot(answers.join('\n\n'), searchResults: results);
+    return ChatMessage.bot(
+      answers.join('\n\n'),
+      overview: overview,
+      searchResults: results,
+    );
   }
 
   // ---------- Scroll ----------

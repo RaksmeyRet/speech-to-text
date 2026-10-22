@@ -1,3 +1,4 @@
+import 'knowledge_overview.dart';
 import 'knowledge_search_result.dart';
 
 enum Sender { user, bot }
@@ -5,8 +6,9 @@ enum Sender { user, bot }
 class ChatMessage {
   final String id;
   final String text;
-  final String? original; // NEW: original text (Khmer or other language)
+  final String? original; // original text (Khmer or other language)
   final Sender sender;
+  final KnowledgeOverview? overview;
   final List<KnowledgeSearchResult> searchResults;
 
   ChatMessage({
@@ -14,6 +16,7 @@ class ChatMessage {
     required this.text,
     required this.sender,
     this.original,
+    this.overview,
     this.searchResults = const [],
   });
 
@@ -28,11 +31,15 @@ class ChatMessage {
 
   factory ChatMessage.bot(
     String text, {
+    KnowledgeOverview? overview,
     List<KnowledgeSearchResult> searchResults = const [],
   }) => ChatMessage(
     id: DateTime.now().microsecondsSinceEpoch.toString(),
     text: text,
     sender: Sender.bot,
-    searchResults: searchResults,
+    overview: overview,
+    searchResults: searchResults.isNotEmpty
+        ? searchResults
+        : (overview?.results ?? const []),
   );
 }
