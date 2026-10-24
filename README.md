@@ -25,8 +25,9 @@ enabled only in the Android debug manifest; use HTTPS for production.
 ## Frontend integration
 
 - Khmer text and speech are translated to English before being sent as the
-  question to `POST /api/rag/knowledge/search/`. The selected language is sent
-  separately so the backend can return the matching-language source.
+  question to `POST /api/rag/knowledge/search/`. Khmer questions receive Khmer
+  answers and translated source cards even when the language dropdown is set to
+  English; otherwise, the selected language is used.
 - Khmer typed questions and live microphone speech are translated to English
   before search. The current backend does not provide uploaded-audio
   transcription, so use the microphone or type the question instead of sending

@@ -9,6 +9,71 @@ import 'package:speech_to_text_app/services/knowledge_api.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test(
+    'Khmer detail view data translates while keeping video metadata',
+    () async {
+      final client = MockClient((request) async {
+        expect(request.url.path, '/api/rag/knowledge/knowledge-id/');
+        return http.Response(
+          jsonEncode({
+            'id': 'knowledge-id',
+            'title': 'Buyer guide',
+            'description': 'How a buyer makes a payment.',
+            'source_type': 'video',
+            'sources': [
+              {
+                'language': 'en',
+                'file_url': 'https://example.com/video.mp4',
+                'duration_seconds': 90,
+                'page_count': null,
+              },
+            ],
+            'segments': [
+              {
+                'id': 'segment-id',
+                'segment_index': 0,
+                'title': 'Scan QR code',
+                'summary': 'Open the bank app.',
+                'transcript': 'Scan the payment QR code.',
+                'start_time_seconds': 19,
+                'end_time_seconds': 34,
+                'page_start': null,
+                'page_end': null,
+              },
+            ],
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final controller = ChatController(
+        knowledgeApi: KnowledgeApi(client: client, baseUrl: 'http://localhost'),
+        translateToKhmer: (text) async => 'ខ្មែរ៖ $text',
+      );
+
+      final document = await controller.loadKnowledge(
+        'knowledge-id',
+        translateToKhmer: true,
+      );
+
+      expect(document.title, 'ខ្មែរ៖ Buyer guide');
+      expect(document.description, 'ខ្មែរ៖ How a buyer makes a payment.');
+      expect(document.segments.single.title, 'ខ្មែរ៖ Scan QR code');
+      expect(document.segments.single.summary, 'ខ្មែរ៖ Open the bank app.');
+      expect(
+        document.segments.single.transcript,
+        'ខ្មែរ៖ Scan the payment QR code.',
+      );
+      expect(document.segments.single.startTimeSeconds, 19);
+      expect(document.segments.single.endTimeSeconds, 34);
+      expect(document.sources.single.fileUrl, 'https://example.com/video.mp4');
+
+      controller.inputController.dispose();
+      controller.scrollController.dispose();
+      client.close();
+    },
+  );
+
   test('typed Khmer is translated before backend search', () async {
     late Map<String, dynamic> requestBody;
     final client = MockClient((request) async {
@@ -65,8 +130,9 @@ void main() {
     final controller = ChatController(
       knowledgeApi: KnowledgeApi(client: client, baseUrl: 'http://localhost'),
       translateKhmer: (_) async => 'How do I sign in?',
+      translateToKhmer: (text) async => 'បកប្រែ៖ $text',
     );
-    controller.selectedLang.value = 'km';
+    controller.selectedLang.value = 'en';
     controller.inputController.text = 'តើខ្ញុំចូលដោយរបៀបណា?';
 
     await controller.send();
@@ -77,8 +143,17 @@ void main() {
     expect(controller.messages.first.original, 'តើខ្ញុំចូលដោយរបៀបណា?');
     expect(
       controller.messages.last.text,
-      'Use the sign-in page.\n\n'
-      '1. Sign in: Enter your username and password.',
+      'បកប្រែ៖ Use the sign-in page.\n\n'
+      'ជំហានទី១៖ បកប្រែ៖ Sign in: Enter your username and password.',
+    );
+    expect(controller.messages.last.responseLanguage, 'km');
+    expect(
+      controller.messages.last.searchResults.single.title,
+      'បកប្រែ៖ Sign in',
+    );
+    expect(
+      controller.messages.last.searchResults.single.summary,
+      'បកប្រែ៖ Enter your username and password.',
     );
     expect(
       controller.messages.last.searchResults.single.fileUrl,
@@ -155,6 +230,7 @@ void main() {
       });
       final controller = ChatController(
         knowledgeApi: KnowledgeApi(client: client, baseUrl: 'http://localhost'),
+        translateToKhmer: (text) async => 'បកប្រែ៖ $text',
       );
       controller.selectedLang.value = 'km';
       controller.inputController.text = 'How do I set up an account?';
@@ -166,10 +242,18 @@ void main() {
       expect(requestBody['language'], 'km');
       expect(
         controller.messages.last.text,
-        'Create an account: Open Settings and select Create account.\n\n'
-        'Verify your account: Enter the verification code sent to your email.',
+        'បកប្រែ៖ Create an account: Open Settings and select Create account.\n\n'
+        'បកប្រែ៖ Verify your account: Enter the verification code sent to your email.',
       );
       expect(controller.messages.last.searchResults, hasLength(2));
+      expect(
+        controller.messages.last.searchResults.first.title,
+        'បកប្រែ៖ Create an account',
+      );
+      expect(
+        controller.messages.last.searchResults.last.transcript,
+        'បកប្រែ៖ Enter the verification code sent to your email.',
+      );
 
       controller.inputController.dispose();
       controller.scrollController.dispose();

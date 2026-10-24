@@ -3,18 +3,23 @@ import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
+import '../constants/app_constants.dart';
 import '../models/knowledge_document.dart';
 import '../models/knowledge_search_result.dart';
 
 class KnowledgeDetailSheet extends StatelessWidget {
   final KnowledgeSearchResult result;
   final Future<KnowledgeDocument> document;
+  final String languageCode;
 
   const KnowledgeDetailSheet({
     super.key,
     required this.result,
     required this.document,
+    this.languageCode = 'en',
   });
+
+  bool get _isKhmer => languageCode == 'km';
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +34,9 @@ class KnowledgeDetailSheet extends StatelessWidget {
             builder: (context, snapshot) {
               if (snapshot.hasError) {
                 return _MessageView(
-                  message: 'Could not load document details: ${snapshot.error}',
+                  message: _isKhmer
+                      ? 'មិនអាចផ្ទុកព័ត៌មានលម្អិតបានទេ។ សូមព្យាយាមម្តងទៀត។'
+                      : 'Could not load document details: ${snapshot.error}',
                 );
               }
               if (!snapshot.hasData) {
@@ -69,21 +76,53 @@ class KnowledgeDetailSheet extends StatelessWidget {
                 children: [
                   Text(
                     knowledge.title,
-                    style: Theme.of(context).textTheme.headlineSmall,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: _isKhmer
+                          ? AppTextStyles.khmerFontWeight
+                          : null,
+                    ),
                   ),
                   if (knowledge.description.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    Text(knowledge.description),
+                    Text(
+                      knowledge.description,
+                      style: TextStyle(
+                        fontWeight: _isKhmer
+                            ? AppTextStyles.khmerFontWeight
+                            : null,
+                      ),
+                    ),
                   ],
                   const SizedBox(height: 18),
-                  Text(title, style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: _isKhmer
+                          ? AppTextStyles.khmerFontWeight
+                          : null,
+                    ),
+                  ),
                   if (summary.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    Text(summary),
+                    Text(
+                      summary,
+                      style: TextStyle(
+                        fontWeight: _isKhmer
+                            ? AppTextStyles.khmerFontWeight
+                            : null,
+                      ),
+                    ),
                   ],
                   if (transcript.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    Text(transcript),
+                    Text(
+                      transcript,
+                      style: TextStyle(
+                        fontWeight: _isKhmer
+                            ? AppTextStyles.khmerFontWeight
+                            : null,
+                      ),
+                    ),
                   ],
                   const SizedBox(height: 18),
                   if (knowledge.sourceType == 'video' && url != null)
@@ -99,16 +138,31 @@ class KnowledgeDetailSheet extends StatelessWidget {
                       onPressed: () => _openFile(url, pageStart),
                       icon: const Icon(Icons.picture_as_pdf_outlined),
                       label: Text(
-                        pageStart == null
+                        _isKhmer
+                            ? pageStart == null
+                                  ? 'បើកឯកសារ'
+                                  : 'បើកឯកសារនៅទំព័រ $pageStart'
+                            : pageStart == null
                             ? 'Open document'
                             : 'Open document at page $pageStart',
+                        style: TextStyle(
+                          fontWeight: _isKhmer
+                              ? AppTextStyles.khmerFontWeight
+                              : null,
+                        ),
                       ),
                     ),
                   if (url == null)
-                    const Text('This document does not have a file URL.'),
+                    Text(
+                      _isKhmer
+                          ? 'ឯកសារនេះមិនមានតំណភ្ជាប់ទេ។'
+                          : 'This document does not have a file URL.',
+                    ),
                   const SizedBox(height: 12),
                   Text(
-                    'Match score: ${(result.score * 100).toStringAsFixed(1)}%',
+                    _isKhmer
+                        ? 'កម្រិតភាពត្រូវគ្នា៖ ${(result.score * 100).toStringAsFixed(1)}%'
+                        : 'Match score: ${(result.score * 100).toStringAsFixed(1)}%',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],

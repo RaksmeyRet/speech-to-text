@@ -39,7 +39,12 @@ class ListeningView extends StatelessWidget {
           Obx(
             () => Text(
               AppStrings.listening(c.selectedLang.value),
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: c.selectedLang.value == 'km'
+                    ? AppTextStyles.khmerFontWeight
+                    : FontWeight.w600,
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -47,10 +52,13 @@ class ListeningView extends StatelessWidget {
             () => Text(
               AppStrings.listeningHint(c.selectedLang.value),
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 height: 1.5,
                 color: Color(0xFF4A5651),
+                fontWeight: c.selectedLang.value == 'km'
+                    ? AppTextStyles.khmerFontWeight
+                    : FontWeight.normal,
               ),
             ),
           ),

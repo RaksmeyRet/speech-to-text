@@ -24,7 +24,12 @@ class ChatScreen extends StatelessWidget {
         title: Obx(
           () => Text(
             c.selectedLang.value == 'km' ? 'ខេមរាបុត្រ' : 'Khemra bot',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: c.selectedLang.value == 'km'
+                  ? AppTextStyles.khmerFontWeight
+                  : FontWeight.w700,
+            ),
           ),
         ),
         actions: [
@@ -51,8 +56,12 @@ class ChatScreen extends StatelessWidget {
                         ? const _TypingBubble()
                         : _Bubble(
                             message: c.messages[i],
-                            onSelectResult: (result) =>
-                                _showKnowledgeDetail(context, c, result),
+                            onSelectResult: (result) => _showKnowledgeDetail(
+                              context,
+                              c,
+                              result,
+                              c.messages[i].responseLanguage,
+                            ),
                           ),
                   );
                 }),
@@ -75,12 +84,20 @@ class ChatScreen extends StatelessWidget {
     BuildContext context,
     ChatController controller,
     KnowledgeSearchResult result,
+    String languageCode,
   ) {
-    final document = controller.loadKnowledge(result.knowledgeId);
+    final document = controller.loadKnowledge(
+      result.knowledgeId,
+      translateToKhmer: languageCode == 'km',
+    );
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => KnowledgeDetailSheet(result: result, document: document),
+      builder: (_) => KnowledgeDetailSheet(
+        result: result,
+        document: document,
+        languageCode: languageCode,
+      ),
     );
   }
 }
@@ -123,6 +140,9 @@ class _Bubble extends StatelessWidget {
               style: TextStyle(
                 fontSize: 15,
                 height: 1.45,
+                fontWeight: message.responseLanguage == 'km'
+                    ? AppTextStyles.khmerFontWeight
+                    : FontWeight.normal,
                 color: isUser ? Colors.white : const Color(0xFF1C2523),
               ),
             ),
@@ -133,13 +153,18 @@ class _Bubble extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
                   message.original!,
-                  style: const TextStyle(fontSize: 12, color: Colors.white70),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.white70,
+                    fontWeight: AppTextStyles.khmerFontWeight,
+                  ),
                 ),
               ),
 
             for (final result in message.searchResults)
               _SearchResultCard(
                 result: result,
+                languageCode: message.responseLanguage,
                 onTap: () => onSelectResult(result),
               ),
           ],
@@ -151,9 +176,14 @@ class _Bubble extends StatelessWidget {
 
 class _SearchResultCard extends StatelessWidget {
   final KnowledgeSearchResult result;
+  final String languageCode;
   final VoidCallback onTap;
 
-  const _SearchResultCard({required this.result, required this.onTap});
+  const _SearchResultCard({
+    required this.result,
+    required this.languageCode,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -164,11 +194,17 @@ class _SearchResultCard extends StatelessWidget {
         ? result.summary
         : result.transcript;
     final location = result.sourceType == 'video'
-        ? result.startTimeSeconds == null
-              ? 'Video'
-              : 'Video · ${result.startTimeSeconds!.toStringAsFixed(1)} sec'
+        ? result.startTimeSeconds == null && result.endTimeSeconds == null
+              ? (languageCode == 'km' ? 'វីដេអូ' : 'Video')
+              : '${languageCode == 'km' ? 'វីដេអូ' : 'Video'} · '
+                    '${result.startTimeSeconds?.toStringAsFixed(1) ?? '—'}'
+                    '–'
+                    '${result.endTimeSeconds?.toStringAsFixed(1) ?? '—'} '
+                    '${languageCode == 'km' ? 'វិនាទី' : 'sec'}'
         : result.pageStart == null
-        ? 'Document'
+        ? (languageCode == 'km' ? 'ឯកសារ' : 'Document')
+        : languageCode == 'km'
+        ? 'ទំព័រ ${result.pageStart}'
         : 'Page ${result.pageStart}';
 
     return Padding(
@@ -196,7 +232,11 @@ class _SearchResultCard extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontWeight: languageCode == 'km'
+                              ? AppTextStyles.khmerFontWeight
+                              : FontWeight.w600,
+                        ),
                       ),
                       if (summary.isNotEmpty) ...[
                         const SizedBox(height: 3),
@@ -204,7 +244,12 @@ class _SearchResultCard extends StatelessWidget {
                           summary,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 13),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: languageCode == 'km'
+                                ? AppTextStyles.khmerFontWeight
+                                : FontWeight.normal,
+                          ),
                         ),
                       ],
                       const SizedBox(height: 4),
@@ -213,6 +258,7 @@ class _SearchResultCard extends StatelessWidget {
                         style: const TextStyle(
                           color: AppColors.primary,
                           fontSize: 12,
+                          fontWeight: AppTextStyles.khmerFontWeight,
                         ),
                       ),
                     ],
@@ -318,23 +364,30 @@ class _InputBar extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: TextField(
-                      controller: c.inputController,
-                      minLines: 1,
-                      maxLines: 4,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => c.send(),
-                      decoration: InputDecoration(
-                        hintText: AppStrings.inputHint,
-                        filled: true,
-                        fillColor: AppColors.inputFill,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 14,
+                    child: Obx(
+                      () => TextField(
+                        controller: c.inputController,
+                        style: TextStyle(
+                          fontWeight: c.selectedLang.value == 'km'
+                              ? AppTextStyles.khmerFontWeight
+                              : FontWeight.normal,
                         ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: BorderSide.none,
+                        minLines: 1,
+                        maxLines: 4,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => c.send(),
+                        decoration: InputDecoration(
+                          hintText: AppStrings.inputHint,
+                          filled: true,
+                          fillColor: AppColors.inputFill,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 14,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            borderSide: BorderSide.none,
+                          ),
                         ),
                       ),
                     ),

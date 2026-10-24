@@ -9,6 +9,10 @@ class AppColors {
   static const border = Color(0xFFDDE3E0);
 }
 
+class AppTextStyles {
+  static const khmerFontWeight = FontWeight.w300;
+}
+
 class AppStrings {
   static const greeting =
       'Hi! Ask me anything about apps. '
@@ -19,10 +23,19 @@ class AppStrings {
   static const noResult =
       "Sorry, I couldn't find an answer for that. Try rephrasing.";
   static const error = 'Sorry, something went wrong. Please try again.';
+  static const noResultKhmer =
+      'សូមអភ័យទោស ខ្ញុំរកមិនឃើញចម្លើយទេ។ សូមសាកល្បងសួរម្តងទៀត។';
+  static const errorKhmer = 'សូមអភ័យទោស មានបញ្ហាកើតឡើង។ សូមព្យាយាមម្តងទៀត។';
   static const inputHint = 'Type or tap the mic…';
 
   static String greetingFor(String languageCode) =>
       languageCode == 'km' ? greetingKhmer : greeting;
+
+  static String noResultFor(String languageCode) =>
+      languageCode == 'km' ? noResultKhmer : noResult;
+
+  static String errorFor(String languageCode) =>
+      languageCode == 'km' ? errorKhmer : error;
 
   // ---------- recording screen ----------
   static String listening(String languageCode) => languageCode == 'km'

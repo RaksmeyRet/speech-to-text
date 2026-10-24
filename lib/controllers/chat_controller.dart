@@ -9,6 +9,7 @@ import '../constants/app_constants.dart';
 import '../constants/app_languages.dart';
 import '../models/chat_message.dart';
 import '../models/knowledge_document.dart';
+import '../models/knowledge_search_result.dart';
 import '../services/knowledge_api.dart';
 
 class ChatController extends GetxController {
@@ -29,6 +30,7 @@ class ChatController extends GetxController {
   final _translator = GoogleTranslator();
   final KnowledgeApi _knowledgeApi;
   late final Future<String> Function(String text) _translateKhmer;
+  late final Future<String> Function(String text) _translateToKhmer;
   PlatformFile? _selectedAudioFile;
   bool _speechReady = false;
   String? _greetingMessageId;
@@ -36,8 +38,10 @@ class ChatController extends GetxController {
   ChatController({
     KnowledgeApi? knowledgeApi,
     Future<String> Function(String text)? translateKhmer,
+    Future<String> Function(String text)? translateToKhmer,
   }) : _knowledgeApi = knowledgeApi ?? KnowledgeApi() {
     _translateKhmer = translateKhmer ?? _translateWithGoogle;
+    _translateToKhmer = translateToKhmer ?? _translateWithGoogleToKhmer;
   }
 
   // ---------- Lifecycle ----------
@@ -49,6 +53,7 @@ class ChatController extends GetxController {
     );
     final greeting = ChatMessage.bot(
       AppStrings.greetingFor(selectedLang.value),
+      responseLanguage: selectedLang.value,
     );
     messages.add(greeting);
     _greetingMessageId = greeting.id;
@@ -84,7 +89,10 @@ class ChatController extends GetxController {
       (message) => message.id == _greetingMessageId,
     );
     if (greetingIndex >= 0) {
-      final greeting = ChatMessage.bot(AppStrings.greetingFor(code));
+      final greeting = ChatMessage.bot(
+        AppStrings.greetingFor(code),
+        responseLanguage: code,
+      );
       messages[greetingIndex] = greeting;
       _greetingMessageId = greeting.id;
     }
@@ -121,8 +129,49 @@ class ChatController extends GetxController {
     selectedAudioFileName.value = null;
   }
 
-  Future<KnowledgeDocument> loadKnowledge(String id) =>
-      _knowledgeApi.getKnowledge(id);
+  Future<KnowledgeDocument> loadKnowledge(
+    String id, {
+    bool translateToKhmer = false,
+  }) async {
+    final document = await _knowledgeApi.getKnowledge(id);
+    if (!translateToKhmer) return document;
+
+    final text = await Future.wait([
+      _toKhmer(document.title),
+      _toKhmer(document.description),
+      ...document.segments.expand(
+        (segment) => [
+          _toKhmer(segment.title),
+          _toKhmer(segment.summary),
+          _toKhmer(segment.transcript),
+        ],
+      ),
+    ]);
+    var textIndex = 2;
+    final segments = document.segments.map((segment) {
+      final translated = KnowledgeDocumentSegment(
+        id: segment.id,
+        segmentIndex: segment.segmentIndex,
+        title: text[textIndex++],
+        summary: text[textIndex++],
+        transcript: text[textIndex++],
+        pageStart: segment.pageStart,
+        pageEnd: segment.pageEnd,
+        startTimeSeconds: segment.startTimeSeconds,
+        endTimeSeconds: segment.endTimeSeconds,
+      );
+      return translated;
+    }).toList();
+
+    return KnowledgeDocument(
+      id: document.id,
+      title: text[0],
+      description: text[1],
+      sourceType: document.sourceType,
+      sources: document.sources,
+      segments: segments,
+    );
+  }
 
   // ---------- Voice: speak -> translate to English -> fill input ----------
   Future<void> toggleListening() async {
@@ -203,6 +252,9 @@ class ChatController extends GetxController {
     }
 
     final spoken = originalText.value.trim(); // set when the user used voice
+    final responseLanguage = _containsKhmer(text) || _containsKhmer(spoken)
+        ? 'km'
+        : selectedLang.value;
     isTyping.value = true;
 
     try {
@@ -220,14 +272,22 @@ class ChatController extends GetxController {
       originalText.value = '';
       clearSelectedAudioFile();
       _add(ChatMessage.user(english, original: original));
-      _add(await _fetchReply(english));
+      _add(await _fetchReply(english, responseLanguage));
     } on QuestionTranslationException catch (error) {
+      _add(
+        ChatMessage.bot(
+          responseLanguage == 'km'
+              ? 'សូមអភ័យទោស មិនអាចបកប្រែចម្លើយជាភាសាខ្មែរបានទេ។ សូមព្យាយាមម្តងទៀត។'
+              : AppStrings.error,
+          responseLanguage: responseLanguage,
+        ),
+      );
       Get.snackbar('Translation failed', error.message);
     } on KnowledgeApiException catch (error) {
-      _add(ChatMessage.bot(AppStrings.error));
+      _add(ChatMessage.bot(AppStrings.errorFor(responseLanguage)));
       Get.snackbar('Search failed', error.message);
     } catch (error) {
-      _add(ChatMessage.bot(AppStrings.error));
+      _add(ChatMessage.bot(AppStrings.errorFor(responseLanguage)));
       Get.snackbar('Search failed', error.toString());
     } finally {
       isTyping.value = false;
@@ -253,16 +313,54 @@ class ChatController extends GetxController {
   Future<String> _translateWithGoogle(String text) async =>
       (await _translator.translate(text, from: 'km', to: 'en')).text;
 
+  Future<String> _translateWithGoogleToKhmer(String text) async =>
+      (await _translator.translate(text, from: 'en', to: 'km')).text;
+
+  Future<String> _toKhmer(String text) async {
+    final value = text.trim();
+    if (value.isEmpty || _containsKhmer(value)) return value;
+    try {
+      final translated = await _translateToKhmer(value);
+      if (translated.trim().isEmpty) {
+        throw const QuestionTranslationException(
+          'No Khmer translation was returned.',
+        );
+      }
+      return translated.trim();
+    } catch (error) {
+      if (error is QuestionTranslationException) rethrow;
+      throw QuestionTranslationException(error.toString());
+    }
+  }
+
   bool _containsKhmer(String text) => RegExp(r'[\u1780-\u17FF]').hasMatch(text);
 
+  String _khmerStepLabel(int number) {
+    const digits = '០១២៣៤៥៦៧៨៩';
+    final khmerNumber = number
+        .toString()
+        .split('')
+        .map((digit) => digits[int.parse(digit)])
+        .join();
+    return 'ជំហានទី$khmerNumber៖';
+  }
+
   // ---------- Knowledge search ----------
-  Future<ChatMessage> _fetchReply(String question) async {
+  Future<ChatMessage> _fetchReply(
+    String question,
+    String responseLanguage,
+  ) async {
     final overview = await _knowledgeApi.searchOverview(
       question: question,
-      language: selectedLang.value,
+      language: responseLanguage,
     );
     final results = overview.results;
-    if (results.isEmpty) return ChatMessage.bot(AppStrings.noResult);
+    if (results.isEmpty) {
+      return ChatMessage.bot(
+        AppStrings.noResultFor(responseLanguage),
+        responseLanguage: responseLanguage,
+      );
+    }
 
     final summary = overview.summary?.trim() ?? '';
     final steps = overview.steps
@@ -273,23 +371,40 @@ class ChatController extends GetxController {
             title,
             instruction,
           ].where((part) => part.isNotEmpty).join(': ');
-          return content.isEmpty ? '' : '${step.stepNumber}. $content';
+          return content.isEmpty ? null : MapEntry(step.stepNumber, content);
         })
-        .where((step) => step.isNotEmpty)
-        .join('\n');
-    final answer = [
-      summary,
-      steps,
-    ].where((part) => part.isNotEmpty).join('\n\n');
+        .whereType<MapEntry<int, String>>()
+        .toList();
+    var translatedSteps = steps;
+    var displayResults = results;
+    if (responseLanguage == 'km') {
+      translatedSteps = await Future.wait(
+        steps.map(
+          (step) async => MapEntry(step.key, await _toKhmer(step.value)),
+        ),
+      );
+      displayResults = await Future.wait(results.map(_translateResultToKhmer));
+    }
+    final answerParts = [
+      if (summary.isNotEmpty)
+        responseLanguage == 'km' ? await _toKhmer(summary) : summary,
+      ...translatedSteps.map(
+        (step) => responseLanguage == 'km'
+            ? '${_khmerStepLabel(step.key)} ${step.value}'
+            : '${step.key}. ${step.value}',
+      ),
+    ];
+    final answer = answerParts.join('\n\n');
     if (answer.isNotEmpty) {
       return ChatMessage.bot(
         answer,
         overview: overview,
-        searchResults: results,
+        searchResults: displayResults,
+        responseLanguage: responseLanguage,
       );
     }
 
-    final answers = results
+    var answers = results
         .map((result) {
           final summary = result.summary.trim();
           final transcript = result.transcript.trim();
@@ -305,11 +420,47 @@ class ChatController extends GetxController {
         .where((answer) => answer.isNotEmpty)
         .toList();
 
-    if (answers.isEmpty) return ChatMessage.bot(AppStrings.noResult);
+    if (responseLanguage == 'km') {
+      answers = await Future.wait(answers.map(_toKhmer));
+    }
+    if (answers.isEmpty) {
+      return ChatMessage.bot(
+        AppStrings.noResultFor(responseLanguage),
+        responseLanguage: responseLanguage,
+      );
+    }
     return ChatMessage.bot(
       answers.join('\n\n'),
       overview: overview,
-      searchResults: results,
+      searchResults: displayResults,
+      responseLanguage: responseLanguage,
+    );
+  }
+
+  Future<KnowledgeSearchResult> _translateResultToKhmer(
+    KnowledgeSearchResult result,
+  ) async {
+    final values = await Future.wait([
+      _toKhmer(result.title),
+      _toKhmer(result.knowledgeTitle),
+      _toKhmer(result.summary),
+      _toKhmer(result.transcript),
+    ]);
+    return KnowledgeSearchResult(
+      segmentId: result.segmentId,
+      knowledgeId: result.knowledgeId,
+      knowledgeTitle: values[1],
+      sourceType: result.sourceType,
+      segmentIndex: result.segmentIndex,
+      title: values[0],
+      summary: values[2],
+      transcript: values[3],
+      pageStart: result.pageStart,
+      pageEnd: result.pageEnd,
+      startTimeSeconds: result.startTimeSeconds,
+      endTimeSeconds: result.endTimeSeconds,
+      score: result.score,
+      fileUrl: result.fileUrl,
     );
   }
 

@@ -10,6 +10,7 @@ class ChatMessage {
   final Sender sender;
   final KnowledgeOverview? overview;
   final List<KnowledgeSearchResult> searchResults;
+  final String responseLanguage;
 
   ChatMessage({
     required this.id,
@@ -18,6 +19,7 @@ class ChatMessage {
     this.original,
     this.overview,
     this.searchResults = const [],
+    this.responseLanguage = 'en',
   });
 
   bool get isUser => sender == Sender.user;
@@ -33,6 +35,7 @@ class ChatMessage {
     String text, {
     KnowledgeOverview? overview,
     List<KnowledgeSearchResult> searchResults = const [],
+    String responseLanguage = 'en',
   }) => ChatMessage(
     id: DateTime.now().microsecondsSinceEpoch.toString(),
     text: text,
@@ -41,5 +44,6 @@ class ChatMessage {
     searchResults: searchResults.isNotEmpty
         ? searchResults
         : (overview?.results ?? const []),
+    responseLanguage: responseLanguage,
   );
 }

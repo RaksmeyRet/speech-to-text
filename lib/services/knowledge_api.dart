@@ -19,7 +19,8 @@ class KnowledgeApiException implements Exception {
 
 class KnowledgeApi {
   // Direct default base URL without requiring any .env or --dart-define
-  static const String directBaseUrl = 'http://127.0.0.1:8000';
+  static const String directBaseUrl =
+      'https://memphis-composite-incorporate-flyer.trycloudflare.com';
 
   final http.Client _client;
   String _baseUrl;
@@ -49,24 +50,21 @@ class KnowledgeApi {
   Future<KnowledgeOverview> searchOverview({
     required String question,
     required String language,
-    int topK = 3,
+    int topK = 1,
     double threshold = 0.10,
   }) async {
-    final response = await _postJson(
-      '/api/rag/knowledge/search/ai-overview/',
-      {
-        'question': question,
-        'language': language,
-        'top_k': topK,
-        'threshold': threshold,
-        'weights': {
-          'question': 0.40,
-          'keyword': 0.30,
-          'summary': 0.20,
-          'topic': 0.10,
-        },
+    final response = await _postJson('/api/rag/knowledge/search/ai-overview/', {
+      'question': question,
+      'language': language,
+      'top_k': topK,
+      'threshold': threshold,
+      'weights': {
+        'question': 0.40,
+        'keyword': 0.30,
+        'summary': 0.20,
+        'topic': 0.10,
       },
-    );
+    });
     final data = _decodeResponse(response);
     if (data['results'] is! List) {
       throw const KnowledgeApiException(
@@ -88,7 +86,10 @@ class KnowledgeApi {
     final payload = jsonEncode(body);
     final headers = const {'Content-Type': 'application/json'};
 
-    final candidates = [_baseUrl, ..._candidateBaseUrls.where((u) => u != _baseUrl)];
+    final candidates = [
+      _baseUrl,
+      ..._candidateBaseUrls.where((u) => u != _baseUrl),
+    ];
     Object? lastError;
 
     for (final base in candidates) {
@@ -116,7 +117,10 @@ class KnowledgeApi {
   }
 
   Future<http.Response> _getJson(String path) async {
-    final candidates = [_baseUrl, ..._candidateBaseUrls.where((u) => u != _baseUrl)];
+    final candidates = [
+      _baseUrl,
+      ..._candidateBaseUrls.where((u) => u != _baseUrl),
+    ];
     Object? lastError;
 
     for (final base in candidates) {

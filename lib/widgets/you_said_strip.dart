@@ -13,9 +13,8 @@ class YouSaidStrip extends StatelessWidget {
     return Obx(() {
       if (c.originalText.isEmpty) return const SizedBox.shrink();
       final code = c.selectedLang.value;
-      final label =
-          '${AppStrings.youSaid(code)} · ${appLanguages[code] ?? ''}'
-              .toUpperCase();
+      final label = '${AppStrings.youSaid(code)} · ${appLanguages[code] ?? ''}'
+          .toUpperCase();
 
       return Container(
         width: double.infinity,
@@ -32,9 +31,11 @@ class YouSaidStrip extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: code == 'km'
+                        ? AppTextStyles.khmerFontWeight
+                        : FontWeight.w600,
                     letterSpacing: 0.5,
                     color: Color(0xFF4A5651),
                   ),
@@ -50,9 +51,11 @@ class YouSaidStrip extends StatelessWidget {
                       const SizedBox(width: 6),
                       Text(
                         AppStrings.translating(code),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: code == 'km'
+                              ? AppTextStyles.khmerFontWeight
+                              : FontWeight.w600,
                           color: AppColors.primary,
                         ),
                       ),
@@ -63,7 +66,11 @@ class YouSaidStrip extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               c.originalText.value,
-              style: const TextStyle(fontSize: 15, height: 1.5),
+              style: const TextStyle(
+                fontSize: 15,
+                height: 1.5,
+                fontWeight: AppTextStyles.khmerFontWeight,
+              ),
             ),
           ],
         ),

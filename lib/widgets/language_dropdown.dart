@@ -23,13 +23,17 @@ class LanguageDropdown extends StatelessWidget {
           child: DropdownButton<String>(
             value: c.selectedLang.value,
             onChanged: locked ? null : (v) => c.setLanguage(v!),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
-              fontWeight: FontWeight.w600,
+              fontWeight: c.selectedLang.value == 'km'
+                  ? AppTextStyles.khmerFontWeight
+                  : FontWeight.w600,
               color: Colors.black87,
             ),
             items: appLanguages.entries
-                .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                .map(
+                  (e) => DropdownMenuItem(value: e.key, child: Text(e.value)),
+                )
                 .toList(),
           ),
         ),
