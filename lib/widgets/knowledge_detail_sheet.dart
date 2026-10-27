@@ -21,6 +21,22 @@ class KnowledgeDetailSheet extends StatelessWidget {
 
   bool get _isKhmer => languageCode == 'km';
 
+  TextStyle _detailTextStyle(TextStyle? base, {required bool bold}) {
+    final style = base ?? const TextStyle();
+    if (!_isKhmer) {
+      return style.copyWith(
+        fontWeight: bold ? FontWeight.w600 : FontWeight.normal,
+      );
+    }
+    return style.copyWith(
+      fontFamily: AppTextStyles.khmerFontFamily,
+      fontWeight: bold ? FontWeight.w600 : AppTextStyles.khmerAnswerFontWeight,
+      fontVariations: bold
+          ? AppTextStyles.khmerBoldFontVariations
+          : AppTextStyles.khmerRegularFontVariations,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -76,62 +92,53 @@ class KnowledgeDetailSheet extends StatelessWidget {
                 children: [
                   Text(
                     knowledge.title,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: _isKhmer
-                          ? AppTextStyles.khmerFontWeight
-                          : null,
+                    style: _detailTextStyle(
+                      Theme.of(context).textTheme.headlineSmall,
+                      bold: true,
                     ),
                   ),
                   if (knowledge.description.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
                       knowledge.description,
-                      style: TextStyle(
-                        fontWeight: _isKhmer
-                            ? AppTextStyles.khmerFontWeight
-                            : null,
-                      ),
+                      style: _detailTextStyle(null, bold: false),
                     ),
                   ],
                   const SizedBox(height: 18),
                   Text(
                     title,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: _isKhmer
-                          ? AppTextStyles.khmerFontWeight
-                          : null,
+                    style: _detailTextStyle(
+                      Theme.of(context).textTheme.titleLarge,
+                      bold: true,
                     ),
                   ),
                   if (summary.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    Text(
-                      summary,
-                      style: TextStyle(
-                        fontWeight: _isKhmer
-                            ? AppTextStyles.khmerFontWeight
-                            : null,
-                      ),
-                    ),
+                    Text(summary, style: _detailTextStyle(null, bold: false)),
                   ],
                   if (transcript.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Text(
                       transcript,
-                      style: TextStyle(
-                        fontWeight: _isKhmer
-                            ? AppTextStyles.khmerFontWeight
-                            : null,
-                      ),
+                      style: _detailTextStyle(null, bold: false),
                     ),
                   ],
                   const SizedBox(height: 18),
                   if (knowledge.sourceType == 'video' && url != null)
-                    _VideoPreview(
-                      url: url,
+                    _InlineVideo(
                       startSeconds:
                           segment?.startTimeSeconds ?? result.startTimeSeconds,
                       endSeconds:
                           segment?.endTimeSeconds ?? result.endTimeSeconds,
+                      languageCode: languageCode,
+                      child: _VideoPlayer(
+                        url: url,
+                        startSeconds:
+                            segment?.startTimeSeconds ??
+                            result.startTimeSeconds,
+                        endSeconds:
+                            segment?.endTimeSeconds ?? result.endTimeSeconds,
+                      ),
                     )
                   else if (url != null)
                     FilledButton.icon(
@@ -146,9 +153,13 @@ class KnowledgeDetailSheet extends StatelessWidget {
                             ? 'Open document'
                             : 'Open document at page $pageStart',
                         style: TextStyle(
-                          fontWeight: _isKhmer
-                              ? AppTextStyles.khmerFontWeight
+                          fontFamily: _isKhmer
+                              ? AppTextStyles.khmerFontFamily
                               : null,
+                          fontVariations: _isKhmer
+                              ? AppTextStyles.khmerBoldFontVariations
+                              : null,
+                          fontWeight: _isKhmer ? FontWeight.w600 : null,
                         ),
                       ),
                     ),
@@ -157,13 +168,17 @@ class KnowledgeDetailSheet extends StatelessWidget {
                       _isKhmer
                           ? 'ឯកសារនេះមិនមានតំណភ្ជាប់ទេ។'
                           : 'This document does not have a file URL.',
+                      style: _detailTextStyle(null, bold: false),
                     ),
                   const SizedBox(height: 12),
                   Text(
                     _isKhmer
                         ? 'កម្រិតភាពត្រូវគ្នា៖ ${(result.score * 100).toStringAsFixed(1)}%'
                         : 'Match score: ${(result.score * 100).toStringAsFixed(1)}%',
-                    style: Theme.of(context).textTheme.bodySmall,
+                    style: _detailTextStyle(
+                      Theme.of(context).textTheme.bodySmall,
+                      bold: false,
+                    ),
                   ),
                 ],
               );
@@ -193,31 +208,73 @@ class KnowledgeDetailSheet extends StatelessWidget {
   }
 }
 
-class _VideoPreview extends StatefulWidget {
+class _InlineVideo extends StatelessWidget {
+  final double? startSeconds;
+  final double? endSeconds;
+  final String languageCode;
+  final Widget child;
+
+  const _InlineVideo({
+    required this.startSeconds,
+    required this.endSeconds,
+    required this.languageCode,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isKhmer = languageCode == 'km';
+    final start = _formatSeconds(startSeconds);
+    final end = _formatSeconds(endSeconds);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          isKhmer
+              ? 'ចាប់ផ្តើម៖ $start វិនាទី · បញ្ចប់៖ $end វិនាទី'
+              : 'Start: $start sec · End: $end sec',
+        ),
+        const SizedBox(height: 12),
+        child,
+      ],
+    );
+  }
+}
+
+String _formatSeconds(double? seconds) =>
+    seconds == null ? '—' : seconds.toStringAsFixed(1);
+
+class _VideoPlayer extends StatefulWidget {
   final String url;
   final double? startSeconds;
   final double? endSeconds;
 
-  const _VideoPreview({
+  const _VideoPlayer({
     required this.url,
     required this.startSeconds,
     required this.endSeconds,
   });
 
   @override
-  State<_VideoPreview> createState() => _VideoPreviewState();
+  State<_VideoPlayer> createState() => _VideoPlayerState();
 }
 
-class _VideoPreviewState extends State<_VideoPreview> {
+class _VideoPlayerState extends State<_VideoPlayer> {
   late final VideoPlayerController _controller;
   Object? _error;
+  bool _stoppingAtSegmentEnd = false;
 
   Duration get _start =>
       Duration(milliseconds: ((widget.startSeconds ?? 0) * 1000).round());
 
-  Duration? get _end => widget.endSeconds == null
+  Duration? get _configuredEnd => widget.endSeconds == null
       ? null
       : Duration(milliseconds: (widget.endSeconds! * 1000).round());
+
+  Duration get _effectiveStart {
+    final end = _effectiveEnd;
+    return end != null && _start > end ? end : _start;
+  }
 
   @override
   void initState() {
@@ -230,23 +287,56 @@ class _VideoPreviewState extends State<_VideoPreview> {
   Future<void> _initialize() async {
     try {
       await _controller.initialize();
-      if (_start > Duration.zero) await _controller.seekTo(_start);
-      if (mounted) setState(() {});
+      await _controller.seekTo(_effectiveStart);
+      if (!mounted) return;
+      setState(() {});
+      await _controller.play();
     } catch (error) {
       if (mounted) setState(() => _error = error);
     }
   }
 
-  // pause at the end of the segment, ready to replay
   void _onTick() {
-    final end = _end;
+    final end = _effectiveEnd;
     final value = _controller.value;
-    if (end != null &&
-        value.isInitialized &&
-        value.isPlaying &&
-        value.position >= end) {
-      _controller.pause();
-      _controller.seekTo(_start);
+    if (end == null ||
+        !value.isInitialized ||
+        !value.isPlaying ||
+        value.position < end ||
+        _stoppingAtSegmentEnd) {
+      return;
+    }
+    _stoppingAtSegmentEnd = true;
+    _returnToSegmentStart();
+  }
+
+  Future<void> _returnToSegmentStart() async {
+    try {
+      await _controller.pause();
+      await _controller.seekTo(_effectiveStart);
+    } catch (error) {
+      if (mounted) setState(() => _error = error);
+    } finally {
+      _stoppingAtSegmentEnd = false;
+    }
+  }
+
+  Duration? get _effectiveEnd {
+    final duration = _controller.value.duration;
+    final configuredEnd = _configuredEnd;
+    if (configuredEnd == null || configuredEnd > duration) return duration;
+    return configuredEnd;
+  }
+
+  Future<void> _startPlayback() async {
+    try {
+      if (_effectiveEnd != null &&
+          _controller.value.position >= _effectiveEnd!) {
+        await _controller.seekTo(_effectiveStart);
+      }
+      await _controller.play();
+    } catch (error) {
+      if (mounted) setState(() => _error = error);
     }
   }
 
@@ -271,12 +361,34 @@ class _VideoPreviewState extends State<_VideoPreview> {
           aspectRatio: _controller.value.aspectRatio,
           child: VideoPlayer(_controller),
         ),
-        VideoProgressIndicator(_controller, allowScrubbing: true),
+        ValueListenableBuilder<VideoPlayerValue>(
+          valueListenable: _controller,
+          builder: (context, value, _) {
+            final end = _effectiveEnd ?? value.duration;
+            final start = _effectiveStart;
+            final range = (end - start).inMilliseconds;
+            final position = value.position.inMilliseconds
+                .clamp(start.inMilliseconds, end.inMilliseconds)
+                .toDouble();
+            return Slider(
+              min: start.inMilliseconds.toDouble(),
+              max: range > 0
+                  ? end.inMilliseconds.toDouble()
+                  : start.inMilliseconds.toDouble() + 1,
+              value: range > 0 ? position : start.inMilliseconds.toDouble(),
+              onChanged: range <= 0
+                  ? null
+                  : (milliseconds) => _controller.seekTo(
+                      Duration(milliseconds: milliseconds.round()),
+                    ),
+            );
+          },
+        ),
         ValueListenableBuilder<VideoPlayerValue>(
           valueListenable: _controller,
           builder: (context, value, _) => IconButton(
-            onPressed: () =>
-                value.isPlaying ? _controller.pause() : _controller.play(),
+            tooltip: value.isPlaying ? 'Pause video' : 'Play video',
+            onPressed: value.isPlaying ? _controller.pause : _startPlayback,
             icon: Icon(value.isPlaying ? Icons.pause : Icons.play_arrow),
           ),
         ),

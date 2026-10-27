@@ -20,7 +20,7 @@ class KnowledgeApiException implements Exception {
 class KnowledgeApi {
   // Direct default base URL without requiring any .env or --dart-define
   static const String directBaseUrl =
-      'https://memphis-composite-incorporate-flyer.trycloudflare.com';
+      'https://ciao-scheduled-convenience-caring.trycloudflare.com';
 
   final http.Client _client;
   String _baseUrl;

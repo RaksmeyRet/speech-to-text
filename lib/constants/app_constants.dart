@@ -1,16 +1,37 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const primary = Color(0xFF0F766E);
-  static const recording = Color(0xFFB42318);
-  static const botBubble = Color(0xFFE6ECE9);
-  static const background = Color(0xFFF6F7F5);
-  static const inputFill = Color(0xFFEEF1EF);
-  static const border = Color(0xFFDDE3E0);
+  // ---------- brand palette ----------
+  static const primaryColor = Color(0xFF092469); // blue
+  static const secondaryColor = Color(0xFFCF951B); // gold
+  static const greyColor = Color(0xFFBDBDBD); // disabled button
+  static const hintColor = Color(0xFF6B7280); // hint in input field
+  static const strokeColor = Color(0xFFEAEAEA); // gray stroke
+  static const redColor = Color(0xFFE53935); // error / recording
+  static const ratingColor = Color(0xFFFFC107); // rating star
+  static const darkGreyColor = Color(0xFF505050);
+  static const blackColor = Color(0xFF3F3F3F);
+  static const whiteColor = Color(0xFFFFFFFF);
+  static const textWhiteColor = Color(0xFFE5E5E5);
+
+  // ---------- names the chat screen already uses ----------
+  static const primary = primaryColor; // user bubble, send and mic buttons
+  static const recording = redColor; // stop button while recording
+  static const border = strokeColor;
+  static const muted = hintColor;
+
+  // light tints of the blue, because the palette has no soft background
+  static const botBubble = Color(0xFFE8ECF6); // bot bubble
+  static const background = Color(0xFFF7F8FB); // screen background
+  static const inputFill = Color(0xFFF1F2F6); // text field
 }
 
 class AppTextStyles {
+  static const khmerFontFamily = 'NotoSansKhmer';
   static const khmerFontWeight = FontWeight.w300;
+  static const khmerAnswerFontWeight = FontWeight.w200;
+  static const khmerRegularFontVariations = [FontVariation('wght', 200)];
+  static const khmerBoldFontVariations = [FontVariation('wght', 600)];
 }
 
 class AppStrings {

@@ -20,7 +20,7 @@ class YouSaidStrip extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
         decoration: const BoxDecoration(
-          color: Colors.white,
+          color: AppColors.whiteColor,
           border: Border(top: BorderSide(color: AppColors.border)),
         ),
         child: Column(
@@ -37,7 +37,7 @@ class YouSaidStrip extends StatelessWidget {
                         ? AppTextStyles.khmerFontWeight
                         : FontWeight.w600,
                     letterSpacing: 0.5,
-                    color: Color(0xFF4A5651),
+                    color: AppColors.darkGreyColor,
                   ),
                 ),
                 if (c.isTranslating.value)

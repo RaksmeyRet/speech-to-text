@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../constants/app_constants.dart';
 import '../controllers/chat_controller.dart';
 import '../models/chat_message.dart';
+import '../models/knowledge_overview.dart';
 import '../models/knowledge_search_result.dart';
 import '../widgets/knowledge_detail_sheet.dart';
 import '../widgets/language_dropdown.dart';
@@ -19,15 +20,21 @@ class ChatScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor: AppColors.whiteColor,
+        surfaceTintColor: AppColors.whiteColor,
         title: Obx(
           () => Text(
             c.selectedLang.value == 'km' ? 'ខេមរាបុត្រ' : 'Khemra bot',
             style: TextStyle(
               fontSize: 20,
+              fontFamily: c.selectedLang.value == 'km'
+                  ? AppTextStyles.khmerFontFamily
+                  : null,
+              fontVariations: c.selectedLang.value == 'km'
+                  ? AppTextStyles.khmerBoldFontVariations
+                  : null,
               fontWeight: c.selectedLang.value == 'km'
-                  ? AppTextStyles.khmerFontWeight
+                  ? FontWeight.w600
                   : FontWeight.w700,
             ),
           ),
@@ -111,6 +118,22 @@ class _Bubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUser = message.isUser;
+    final textStyle = TextStyle(
+      fontSize: 15,
+      height: 1.45,
+      fontFamily: message.responseLanguage == 'km'
+          ? AppTextStyles.khmerFontFamily
+          : null,
+      fontVariations: message.responseLanguage == 'km'
+          ? AppTextStyles.khmerRegularFontVariations
+          : null,
+      fontWeight: message.responseLanguage == 'km'
+          ? isUser
+                ? AppTextStyles.khmerFontWeight
+                : AppTextStyles.khmerAnswerFontWeight
+          : FontWeight.normal,
+      color: isUser ? AppColors.whiteColor : AppColors.blackColor,
+    );
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -134,18 +157,7 @@ class _Bubble extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // English text
-            Text(
-              message.text,
-              style: TextStyle(
-                fontSize: 15,
-                height: 1.45,
-                fontWeight: message.responseLanguage == 'km'
-                    ? AppTextStyles.khmerFontWeight
-                    : FontWeight.normal,
-                color: isUser ? Colors.white : const Color(0xFF1C2523),
-              ),
-            ),
+            Text.rich(_answerTextSpan(message, textStyle), style: textStyle),
 
             // NEW: original text (Khmer or other language) under the English
             if (isUser && message.original != null)
@@ -155,8 +167,10 @@ class _Bubble extends StatelessWidget {
                   message.original!,
                   style: const TextStyle(
                     fontSize: 12,
-                    color: Colors.white70,
+                    color: AppColors.textWhiteColor,
                     fontWeight: AppTextStyles.khmerFontWeight,
+                    fontFamily: AppTextStyles.khmerFontFamily,
+                    fontVariations: AppTextStyles.khmerRegularFontVariations,
                   ),
                 ),
               ),
@@ -172,6 +186,110 @@ class _Bubble extends StatelessWidget {
       ),
     );
   }
+}
+
+TextSpan _answerTextSpan(ChatMessage message, TextStyle style) {
+  final overview = message.overview;
+  if (overview == null || overview.steps.isEmpty) {
+    return TextSpan(text: message.text, style: style);
+  }
+
+  final boldStyle = style.copyWith(
+    fontWeight: message.responseLanguage == 'km'
+        ? FontWeight.w600
+        : FontWeight.bold,
+    fontVariations: message.responseLanguage == 'km'
+        ? AppTextStyles.khmerBoldFontVariations
+        : null,
+  );
+  if (message.responseLanguage == 'km') {
+    return _khmerAnswerTextSpan(overview, style, boldStyle);
+  }
+  if (message.responseLanguage != 'en') {
+    return TextSpan(text: message.text, style: style);
+  }
+
+  final summary = overview.summary?.trim() ?? '';
+  final steps = overview.steps
+      .map((step) {
+        final title = step.title.trim();
+        final instruction = step.instruction.trim();
+        final content = [
+          title,
+          instruction,
+        ].where((part) => part.isNotEmpty).join(': ');
+        return content.isEmpty ? null : (step.stepNumber, title, instruction);
+      })
+      .whereType<(int, String, String)>()
+      .toList();
+  final spans = <InlineSpan>[];
+
+  if (summary.isNotEmpty) {
+    spans.add(TextSpan(text: summary));
+  }
+  for (final (number, title, instruction) in steps) {
+    if (spans.isNotEmpty) spans.add(const TextSpan(text: '\n\n'));
+    spans.addAll([
+      TextSpan(text: 'Step $number:', style: boldStyle),
+      const TextSpan(text: ' '),
+      if (title.isNotEmpty) TextSpan(text: title, style: boldStyle),
+      if (title.isNotEmpty && instruction.isNotEmpty)
+        const TextSpan(text: ': '),
+      if (instruction.isNotEmpty) TextSpan(text: instruction),
+    ]);
+  }
+  if (spans.isEmpty) return TextSpan(text: message.text, style: style);
+  return TextSpan(children: spans, style: style);
+}
+
+TextSpan _khmerAnswerTextSpan(
+  KnowledgeOverview overview,
+  TextStyle style,
+  TextStyle boldStyle,
+) {
+  final spans = <InlineSpan>[];
+  final summary = overview.summary?.trim() ?? '';
+  if (summary.isNotEmpty) {
+    spans.add(TextSpan(text: summary, style: style));
+  }
+
+  for (final step in overview.steps) {
+    final title = step.title.trim();
+    final instruction = step.instruction.trim();
+    if (title.isEmpty && instruction.isEmpty) continue;
+    if (spans.isNotEmpty) spans.add(const TextSpan(text: '\n\n'));
+    spans.add(
+      TextSpan(
+        text: 'ជំហានទី${_khmerNumber(step.stepNumber)}៖',
+        style: boldStyle,
+      ),
+    );
+    if (title.isNotEmpty) {
+      spans.add(const TextSpan(text: ' '));
+      spans.add(TextSpan(text: title, style: boldStyle));
+    }
+    if (instruction.isNotEmpty) {
+      spans.add(
+        TextSpan(
+          text: title.isNotEmpty ? '៖ $instruction' : ' $instruction',
+          style: style,
+        ),
+      );
+    }
+  }
+
+  return spans.isEmpty
+      ? TextSpan(text: overview.summary ?? '', style: style)
+      : TextSpan(children: spans, style: style);
+}
+
+String _khmerNumber(int number) {
+  const digits = '០១២៣៤៥៦៧៨៩';
+  return number
+      .toString()
+      .split('')
+      .map((digit) => digits[int.parse(digit)])
+      .join();
 }
 
 class _SearchResultCard extends StatelessWidget {
@@ -210,7 +328,7 @@ class _SearchResultCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 9),
       child: Material(
-        color: Colors.white,
+        color: AppColors.whiteColor,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: onTap,
@@ -223,7 +341,7 @@ class _SearchResultCard extends StatelessWidget {
                   result.sourceType == 'video'
                       ? Icons.play_circle_outline
                       : Icons.description_outlined,
-                  color: AppColors.primary,
+                  color: AppColors.secondaryColor,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -233,9 +351,13 @@ class _SearchResultCard extends StatelessWidget {
                       Text(
                         title,
                         style: TextStyle(
-                          fontWeight: languageCode == 'km'
-                              ? AppTextStyles.khmerFontWeight
-                              : FontWeight.w600,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: languageCode == 'km'
+                              ? AppTextStyles.khmerFontFamily
+                              : null,
+                          fontVariations: languageCode == 'km'
+                              ? AppTextStyles.khmerBoldFontVariations
+                              : null,
                         ),
                       ),
                       if (summary.isNotEmpty) ...[
@@ -247,18 +369,32 @@ class _SearchResultCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: languageCode == 'km'
-                                ? AppTextStyles.khmerFontWeight
+                                ? AppTextStyles.khmerAnswerFontWeight
                                 : FontWeight.normal,
+                            fontFamily: languageCode == 'km'
+                                ? AppTextStyles.khmerFontFamily
+                                : null,
+                            fontVariations: languageCode == 'km'
+                                ? AppTextStyles.khmerRegularFontVariations
+                                : null,
                           ),
                         ),
                       ],
                       const SizedBox(height: 4),
                       Text(
                         location,
-                        style: const TextStyle(
-                          color: AppColors.primary,
+                        style: TextStyle(
+                          color: AppColors.secondaryColor,
                           fontSize: 12,
-                          fontWeight: AppTextStyles.khmerFontWeight,
+                          fontWeight: languageCode == 'km'
+                              ? AppTextStyles.khmerAnswerFontWeight
+                              : FontWeight.normal,
+                          fontFamily: languageCode == 'km'
+                              ? AppTextStyles.khmerFontFamily
+                              : null,
+                          fontVariations: languageCode == 'km'
+                              ? AppTextStyles.khmerRegularFontVariations
+                              : null,
                         ),
                       ),
                     ],
@@ -303,7 +439,7 @@ class _InputBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white,
+      color: AppColors.whiteColor,
       child: SafeArea(
         top: false,
         child: Padding(
@@ -371,6 +507,12 @@ class _InputBar extends StatelessWidget {
                           fontWeight: c.selectedLang.value == 'km'
                               ? AppTextStyles.khmerFontWeight
                               : FontWeight.normal,
+                          fontFamily: c.selectedLang.value == 'km'
+                              ? AppTextStyles.khmerFontFamily
+                              : null,
+                          fontVariations: c.selectedLang.value == 'km'
+                              ? AppTextStyles.khmerRegularFontVariations
+                              : null,
                         ),
                         minLines: 1,
                         maxLines: 4,
@@ -425,10 +567,10 @@ class _InputBar extends StatelessWidget {
                                 padding: EdgeInsets.all(14),
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color: AppColors.whiteColor,
                                 ),
                               )
-                            : Icon(icon, color: Colors.white),
+                            : Icon(icon, color: AppColors.whiteColor),
                       ),
                     );
                   }),

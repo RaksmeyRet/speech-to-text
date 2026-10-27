@@ -10,7 +10,7 @@ class ListeningView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xF0F6F7F5),
+      color: AppColors.background.withValues(alpha: 0.94),
       alignment: Alignment.center,
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
@@ -31,7 +31,11 @@ class ListeningView extends StatelessWidget {
                   color: AppColors.recording,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.mic, color: Colors.white, size: 30),
+                child: const Icon(
+                  Icons.mic,
+                  color: AppColors.whiteColor,
+                  size: 30,
+                ),
               ),
             ),
           ),
@@ -55,7 +59,7 @@ class ListeningView extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 height: 1.5,
-                color: Color(0xFF4A5651),
+                color: AppColors.darkGreyColor,
                 fontWeight: c.selectedLang.value == 'km'
                     ? AppTextStyles.khmerFontWeight
                     : FontWeight.normal,

@@ -14,7 +14,19 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorSchemeSeed: AppColors.primary,
+        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primaryColor)
+            .copyWith(
+              primary: AppColors.primaryColor,
+              secondary: AppColors.secondaryColor,
+              surface: AppColors.whiteColor,
+              error: AppColors.redColor,
+            ),
+        scaffoldBackgroundColor: AppColors.background,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: AppColors.whiteColor,
+          foregroundColor: AppColors.primaryColor,
+          surfaceTintColor: AppColors.whiteColor,
+        ),
       ),
       home: const ChatScreen(),
     );

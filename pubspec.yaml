@@ -60,6 +60,11 @@ dev_dependencies:
 # The following section is specific to Flutter packages.
 flutter:
   uses-material-design: true
+  fonts:
+    - family: NotoSansKhmer
+      fonts:
+        - asset: assets/fonts/NotoSansKhmer-Variable.ttf
+          weight: 100
 
   # To add assets to your application, add an assets section, like this:
   # assets:

@@ -84,4 +84,34 @@ void main() {
     api.close();
     client.close();
   });
+
+  test('connection errors identify the configured backend URL', () async {
+    final client = MockClient((_) async {
+      throw http.ClientException('Connection timed out');
+    });
+    final api = KnowledgeApi(
+      client: client,
+      baseUrl: 'http://172.16.10.101:8000',
+    );
+
+    await expectLater(
+      api.searchOverview(question: 'test', language: 'en'),
+      throwsA(
+        isA<KnowledgeApiException>()
+            .having(
+              (error) => error.message,
+              'message',
+              contains('http://172.16.10.101:8000'),
+            )
+            .having(
+              (error) => error.message,
+              'message',
+              contains('computer LAN IP'),
+            ),
+      ),
+    );
+
+    api.close();
+    client.close();
+  });
 }

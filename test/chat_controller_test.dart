@@ -144,7 +144,8 @@ void main() {
     expect(
       controller.messages.last.text,
       'បកប្រែ៖ Use the sign-in page.\n\n'
-      'ជំហានទី១៖ បកប្រែ៖ Sign in: Enter your username and password.',
+      'ជំហានទី១៖ បកប្រែ៖ Sign in៖ '
+      'បកប្រែ៖ Enter your username and password.',
     );
     expect(controller.messages.last.responseLanguage, 'km');
     expect(
@@ -253,6 +254,61 @@ void main() {
       expect(
         controller.messages.last.searchResults.last.transcript,
         'បកប្រែ៖ Enter the verification code sent to your email.',
+      );
+
+      controller.inputController.dispose();
+      controller.scrollController.dispose();
+      client.close();
+    },
+  );
+
+  test(
+    'English overview steps are labeled Step 1, Step 2, and so on',
+    () async {
+      final client = MockClient((_) async {
+        return http.Response(
+          jsonEncode({
+            'summary': 'Set up your account.',
+            'steps': [
+              {
+                'step_number': 1,
+                'title': 'Open settings',
+                'instruction': 'Go to Settings.',
+                'segment_id': 'segment-1',
+              },
+              {
+                'step_number': 2,
+                'title': 'Create account',
+                'instruction': 'Select Create account.',
+                'segment_id': 'segment-2',
+              },
+              {
+                'step_number': 3,
+                'title': 'Confirm',
+                'instruction': 'Follow the confirmation prompt.',
+                'segment_id': 'segment-3',
+              },
+            ],
+            'results': [{}],
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final controller = ChatController(
+        knowledgeApi: KnowledgeApi(client: client, baseUrl: 'http://localhost'),
+      );
+      controller.selectedLang.value = 'en';
+      controller.inputController.text = 'How do I set up an account?';
+
+      await controller.send();
+
+      expect(
+        controller.messages.last.text,
+        'Set up your account.\n\n'
+        'Step 1: Open settings: Go to Settings.\n\n'
+        'Step 2: Create account: Select Create account.\n\n'
+        'Step 3: Confirm: Follow the confirmation prompt.',
       );
 
       controller.inputController.dispose();

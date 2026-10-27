@@ -9,6 +9,7 @@ import '../constants/app_constants.dart';
 import '../constants/app_languages.dart';
 import '../models/chat_message.dart';
 import '../models/knowledge_document.dart';
+import '../models/knowledge_overview.dart';
 import '../models/knowledge_search_result.dart';
 import '../services/knowledge_api.dart';
 
@@ -364,41 +365,71 @@ class ChatController extends GetxController {
 
     final summary = overview.summary?.trim() ?? '';
     final steps = overview.steps
-        .map((step) {
-          final title = step.title.trim();
-          final instruction = step.instruction.trim();
-          final content = [
-            title,
-            instruction,
-          ].where((part) => part.isNotEmpty).join(': ');
-          return content.isEmpty ? null : MapEntry(step.stepNumber, content);
-        })
-        .whereType<MapEntry<int, String>>()
+        .map(
+          (step) => (
+            number: step.stepNumber,
+            segmentId: step.segmentId,
+            title: step.title.trim(),
+            instruction: step.instruction.trim(),
+          ),
+        )
+        .where((step) => step.title.isNotEmpty || step.instruction.isNotEmpty)
         .toList();
     var translatedSteps = steps;
     var displayResults = results;
     if (responseLanguage == 'km') {
       translatedSteps = await Future.wait(
         steps.map(
-          (step) async => MapEntry(step.key, await _toKhmer(step.value)),
+          (step) async => (
+            number: step.number,
+            segmentId: step.segmentId,
+            title: await _toKhmer(step.title),
+            instruction: await _toKhmer(step.instruction),
+          ),
         ),
       );
       displayResults = await Future.wait(results.map(_translateResultToKhmer));
     }
+    final displaySummary = summary.isEmpty
+        ? ''
+        : responseLanguage == 'km'
+        ? await _toKhmer(summary)
+        : summary;
+    final displayOverview = responseLanguage == 'km'
+        ? KnowledgeOverview(
+            summary: displaySummary,
+            steps: translatedSteps
+                .map(
+                  (step) => KnowledgeOverviewStep(
+                    stepNumber: step.number,
+                    title: step.title,
+                    instruction: step.instruction,
+                    segmentId: step.segmentId,
+                  ),
+                )
+                .toList(),
+            results: displayResults,
+          )
+        : overview;
     final answerParts = [
-      if (summary.isNotEmpty)
-        responseLanguage == 'km' ? await _toKhmer(summary) : summary,
+      if (displaySummary.isNotEmpty) displaySummary,
       ...translatedSteps.map(
         (step) => responseLanguage == 'km'
-            ? '${_khmerStepLabel(step.key)} ${step.value}'
-            : '${step.key}. ${step.value}',
+            ? '${_khmerStepLabel(step.number)} '
+                  '${step.title}'
+                  '${step.title.isNotEmpty && step.instruction.isNotEmpty ? '៖ ' : ''}'
+                  '${step.instruction}'
+            : 'Step ${step.number}: '
+                  '${step.title}'
+                  '${step.title.isNotEmpty && step.instruction.isNotEmpty ? ': ' : ''}'
+                  '${step.instruction}',
       ),
     ];
     final answer = answerParts.join('\n\n');
     if (answer.isNotEmpty) {
       return ChatMessage.bot(
         answer,
-        overview: overview,
+        overview: displayOverview,
         searchResults: displayResults,
         responseLanguage: responseLanguage,
       );

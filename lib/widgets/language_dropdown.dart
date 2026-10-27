@@ -15,7 +15,7 @@ class LanguageDropdown extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          color: locked ? const Color(0xFFF1F3F2) : Colors.white,
+          color: locked ? AppColors.inputFill : AppColors.whiteColor,
           border: Border.all(color: AppColors.border),
           borderRadius: BorderRadius.circular(22),
         ),
@@ -28,7 +28,7 @@ class LanguageDropdown extends StatelessWidget {
               fontWeight: c.selectedLang.value == 'km'
                   ? AppTextStyles.khmerFontWeight
                   : FontWeight.w600,
-              color: Colors.black87,
+              color: AppColors.blackColor,
             ),
             items: appLanguages.entries
                 .map(
