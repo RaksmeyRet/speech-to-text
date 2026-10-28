@@ -34,6 +34,7 @@ class ChatController extends GetxController {
   late final Future<String> Function(String text) _translateToKhmer;
   PlatformFile? _selectedAudioFile;
   bool _speechReady = false;
+  bool _speechCompletionHandled = false;
   String? _greetingMessageId;
 
   ChatController({
@@ -188,6 +189,7 @@ class ChatController extends GetxController {
     }
 
     originalText.value = '';
+    _speechCompletionHandled = false;
     isListening.value = true;
     await _speech.listen(
       listenOptions: SpeechListenOptions(
@@ -195,41 +197,17 @@ class ChatController extends GetxController {
       ),
       onResult: (r) {
         originalText.value = r.recognizedWords;
-        if (r.finalResult) _translateToEnglish(r.recognizedWords);
       },
     );
   }
 
   void _handleSpeechFinished() {
+    if (_speechCompletionHandled) return;
     final text = originalText.value.trim();
-    if (text.isNotEmpty && inputController.text.trim().isEmpty) {
-      _translateToEnglish(text);
-    }
-  }
-
-  Future<void> _translateToEnglish(String text) async {
-    if (text.trim().isEmpty) return;
-
-    if (selectedLang.value == 'en') {
-      _setInput(text);
-      return;
-    }
-
-    isTranslating.value = true;
-    try {
-      _setInput(await _toEnglish(text));
-    } catch (_) {
-      Get.snackbar('Translation failed', 'Check your internet and try again.');
-    } finally {
-      isTranslating.value = false;
-    }
-  }
-
-  void _setInput(String text) {
-    inputController.text = text;
-    inputController.selection = TextSelection.fromPosition(
-      TextPosition(offset: text.length),
-    );
+    if (text.isEmpty) return;
+    _speechCompletionHandled = true;
+    originalText.value = '';
+    submitVoiceTranscript(text);
   }
 
   // ---------- Send ----------
@@ -247,6 +225,17 @@ class ChatController extends GetxController {
       }
       return;
     }
+    await _submitQuestion(text);
+  }
+
+  Future<void> submitVoiceTranscript(String transcript) async {
+    final text = transcript.trim();
+    if (text.isEmpty || isTyping.value || isTranslating.value) return;
+    await _submitQuestion(text, fromVoice: true);
+  }
+
+  Future<void> _submitQuestion(String text, {bool fromVoice = false}) async {
+    if (isTyping.value || isTranslating.value) return;
     if (isListening.value) {
       await _speech.stop();
       isListening.value = false;
@@ -255,24 +244,57 @@ class ChatController extends GetxController {
     final spoken = originalText.value.trim(); // set when the user used voice
     final responseLanguage = _containsKhmer(text) || _containsKhmer(spoken)
         ? 'km'
-        : selectedLang.value;
+        : 'en';
     isTyping.value = true;
 
     try {
       late final String english;
-      String? original;
-      if (_containsKhmer(text)) {
-        english = await _toEnglish(text);
-        original = text;
-      } else {
-        english = text;
-        original = _containsKhmer(spoken) ? spoken : null;
+      final original = _containsKhmer(text)
+          ? text
+          : _containsKhmer(spoken)
+          ? spoken
+          : null;
+      ChatMessage? voiceMessage;
+      if (fromVoice) {
+        voiceMessage = ChatMessage.user(
+          text,
+          original: original,
+          responseLanguage: responseLanguage,
+        );
+        _add(voiceMessage);
       }
 
-      inputController.clear();
+      if (_containsKhmer(text)) {
+        english = await _toEnglish(text);
+      } else {
+        english = text;
+      }
+
+      if (!fromVoice) inputController.clear();
       originalText.value = '';
       clearSelectedAudioFile();
-      _add(ChatMessage.user(english, original: original));
+      if (voiceMessage == null) {
+        _add(
+          ChatMessage.user(
+            english,
+            original: original,
+            responseLanguage: responseLanguage,
+          ),
+        );
+      } else {
+        final messageIndex = messages.indexWhere(
+          (message) => message.id == voiceMessage!.id,
+        );
+        if (messageIndex >= 0) {
+          messages[messageIndex] = ChatMessage(
+            id: voiceMessage.id,
+            text: english,
+            sender: Sender.user,
+            original: original,
+            responseLanguage: responseLanguage,
+          );
+        }
+      }
       _add(await _fetchReply(english, responseLanguage));
     } on QuestionTranslationException catch (error) {
       _add(
@@ -285,10 +307,20 @@ class ChatController extends GetxController {
       );
       Get.snackbar('Translation failed', error.message);
     } on KnowledgeApiException catch (error) {
-      _add(ChatMessage.bot(AppStrings.errorFor(responseLanguage)));
+      _add(
+        ChatMessage.bot(
+          AppStrings.errorFor(responseLanguage),
+          responseLanguage: responseLanguage,
+        ),
+      );
       Get.snackbar('Search failed', error.message);
     } catch (error) {
-      _add(ChatMessage.bot(AppStrings.errorFor(responseLanguage)));
+      _add(
+        ChatMessage.bot(
+          AppStrings.errorFor(responseLanguage),
+          responseLanguage: responseLanguage,
+        ),
+      );
       Get.snackbar('Search failed', error.toString());
     } finally {
       isTyping.value = false;
@@ -353,7 +385,7 @@ class ChatController extends GetxController {
   ) async {
     final overview = await _knowledgeApi.searchOverview(
       question: question,
-      language: responseLanguage,
+      language: 'en',
     );
     final results = overview.results;
     if (results.isEmpty) {

@@ -8,7 +8,6 @@ import '../models/knowledge_search_result.dart';
 import '../widgets/knowledge_detail_sheet.dart';
 import '../widgets/language_dropdown.dart';
 import '../widgets/listening_view.dart';
-import '../widgets/you_said_strip.dart';
 
 class ChatScreen extends StatelessWidget {
   const ChatScreen({super.key});
@@ -65,7 +64,6 @@ class ChatScreen extends StatelessWidget {
                             message: c.messages[i],
                             onSelectResult: (result) => _showKnowledgeDetail(
                               context,
-                              c,
                               result,
                               c.messages[i].responseLanguage,
                             ),
@@ -80,7 +78,6 @@ class ChatScreen extends StatelessWidget {
               ],
             ),
           ),
-          YouSaidStrip(c: c),
           _InputBar(c: c),
         ],
       ),
@@ -89,22 +86,20 @@ class ChatScreen extends StatelessWidget {
 
   void _showKnowledgeDetail(
     BuildContext context,
-    ChatController controller,
     KnowledgeSearchResult result,
     String languageCode,
   ) {
-    final document = controller.loadKnowledge(
-      result.knowledgeId,
-      translateToKhmer: languageCode == 'km',
-    );
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => KnowledgeDetailSheet(
-        result: result,
-        document: document,
-        languageCode: languageCode,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      clipBehavior: Clip.antiAlias,
+      builder: (_) =>
+          KnowledgeDetailSheet(result: result, languageCode: languageCode),
     );
   }
 }
@@ -159,22 +154,6 @@ class _Bubble extends StatelessWidget {
           children: [
             Text.rich(_answerTextSpan(message, textStyle), style: textStyle),
 
-            // NEW: original text (Khmer or other language) under the English
-            if (isUser && message.original != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  message.original!,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textWhiteColor,
-                    fontWeight: AppTextStyles.khmerFontWeight,
-                    fontFamily: AppTextStyles.khmerFontFamily,
-                    fontVariations: AppTextStyles.khmerRegularFontVariations,
-                  ),
-                ),
-              ),
-
             for (final result in message.searchResults)
               _SearchResultCard(
                 result: result,
@@ -189,6 +168,10 @@ class _Bubble extends StatelessWidget {
 }
 
 TextSpan _answerTextSpan(ChatMessage message, TextStyle style) {
+  if (message.isUser) {
+    return TextSpan(text: message.displayText, style: style);
+  }
+
   final overview = message.overview;
   if (overview == null || overview.steps.isEmpty) {
     return TextSpan(text: message.text, style: style);
@@ -292,6 +275,23 @@ String _khmerNumber(int number) {
       .join();
 }
 
+String _pageRangeLabel(KnowledgeSearchResult result, String languageCode) {
+  final start = result.pageStart;
+  final end = result.pageEnd;
+
+  if (start == null && end == null) {
+    return languageCode == 'km' ? 'ឯកសារ' : 'Document';
+  }
+  if (start == null) {
+    return languageCode == 'km' ? 'ទំព័រ $end' : 'Page $end';
+  }
+  if (end == null || end == start) {
+    return languageCode == 'km' ? 'ទំព័រ $start' : 'Page $start';
+  }
+
+  return languageCode == 'km' ? 'ទំព័រ $start–$end' : 'Page $start–$end';
+}
+
 class _SearchResultCard extends StatelessWidget {
   final KnowledgeSearchResult result;
   final String languageCode;
@@ -319,11 +319,7 @@ class _SearchResultCard extends StatelessWidget {
                     '–'
                     '${result.endTimeSeconds?.toStringAsFixed(1) ?? '—'} '
                     '${languageCode == 'km' ? 'វិនាទី' : 'sec'}'
-        : result.pageStart == null
-        ? (languageCode == 'km' ? 'ឯកសារ' : 'Document')
-        : languageCode == 'km'
-        ? 'ទំព័រ ${result.pageStart}'
-        : 'Page ${result.pageStart}';
+        : _pageRangeLabel(result, languageCode);
 
     return Padding(
       padding: const EdgeInsets.only(top: 9),

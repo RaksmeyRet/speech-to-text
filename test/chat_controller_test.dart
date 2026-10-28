@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:speech_to_text_app/constants/app_constants.dart';
 import 'package:speech_to_text_app/controllers/chat_controller.dart';
 import 'package:speech_to_text_app/services/knowledge_api.dart';
 
@@ -138,9 +139,11 @@ void main() {
     await controller.send();
 
     expect(requestBody['question'], 'How do I sign in?');
-    expect(requestBody['language'], 'km');
+    expect(requestBody['language'], 'en');
     expect(controller.messages.first.text, 'How do I sign in?');
     expect(controller.messages.first.original, 'តើខ្ញុំចូលដោយរបៀបណា?');
+    expect(controller.messages.first.displayText, 'តើខ្ញុំចូលដោយរបៀបណា?');
+    expect(controller.messages.first.responseLanguage, 'km');
     expect(
       controller.messages.last.text,
       'បកប្រែ៖ Use the sign-in page.\n\n'
@@ -240,7 +243,7 @@ void main() {
       await controller.send();
 
       expect(requestBody['question'], 'How do I set up an account?');
-      expect(requestBody['language'], 'km');
+      expect(requestBody['language'], 'en');
       expect(
         controller.messages.last.text,
         'បកប្រែ៖ Create an account: Open Settings and select Create account.\n\n'
@@ -255,6 +258,11 @@ void main() {
         controller.messages.last.searchResults.last.transcript,
         'បកប្រែ៖ Enter the verification code sent to your email.',
       );
+      expect(
+        controller.messages.first.displayText,
+        'តើខ្ញុំបង្កើតគណនីដោយរបៀបណា?',
+      );
+      expect(controller.messages.first.responseLanguage, 'km');
 
       controller.inputController.dispose();
       controller.scrollController.dispose();
@@ -310,6 +318,70 @@ void main() {
         'Step 2: Create account: Select Create account.\n\n'
         'Step 3: Confirm: Follow the confirmation prompt.',
       );
+
+      controller.inputController.dispose();
+      controller.scrollController.dispose();
+      client.close();
+    },
+  );
+
+  test(
+    'English text remains English when the selected UI language is Khmer',
+    () async {
+      late Map<String, dynamic> requestBody;
+      final client = MockClient((request) async {
+        requestBody = jsonDecode(request.body) as Map<String, dynamic>;
+        return http.Response(
+          jsonEncode({'results': []}),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final controller = ChatController(
+        knowledgeApi: KnowledgeApi(client: client, baseUrl: 'http://localhost'),
+      );
+      controller.inputController.text = 'How do I sign in?';
+
+      await controller.send();
+
+      expect(requestBody['question'], 'How do I sign in?');
+      expect(requestBody['language'], 'en');
+      expect(controller.messages.first.displayText, 'How do I sign in?');
+      expect(controller.messages.first.responseLanguage, 'en');
+      expect(controller.messages.last.text, AppStrings.noResult);
+
+      controller.inputController.dispose();
+      controller.scrollController.dispose();
+      client.close();
+    },
+  );
+
+  test(
+    'completed voice transcript displays and searches automatically',
+    () async {
+      late Map<String, dynamic> requestBody;
+      final client = MockClient((request) async {
+        requestBody = jsonDecode(request.body) as Map<String, dynamic>;
+        return http.Response(
+          jsonEncode({'results': []}),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final controller = ChatController(
+        knowledgeApi: KnowledgeApi(client: client, baseUrl: 'http://localhost'),
+        translateKhmer: (_) async => 'How do I sign in?',
+      );
+      controller.originalText.value = 'តើខ្ញុំចូលដោយរបៀបណា?';
+
+      await controller.submitVoiceTranscript('តើខ្ញុំចូលដោយរបៀបណា?');
+
+      expect(requestBody['question'], 'How do I sign in?');
+      expect(requestBody['language'], 'en');
+      expect(controller.inputController.text, isEmpty);
+      expect(controller.messages.first.displayText, 'តើខ្ញុំចូលដោយរបៀបណា?');
+      expect(controller.messages.first.text, 'How do I sign in?');
+      expect(controller.messages.last.text, AppStrings.noResultKhmer);
 
       controller.inputController.dispose();
       controller.scrollController.dispose();

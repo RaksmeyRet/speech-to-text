@@ -1,21 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import '../constants/app_constants.dart';
-import '../models/knowledge_document.dart';
 import '../models/knowledge_search_result.dart';
 
 class KnowledgeDetailSheet extends StatelessWidget {
   final KnowledgeSearchResult result;
-  final Future<KnowledgeDocument> document;
   final String languageCode;
 
   const KnowledgeDetailSheet({
     super.key,
     required this.result,
-    required this.document,
     this.languageCode = 'en',
   });
 
@@ -39,210 +34,137 @@ class KnowledgeDetailSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isVideo = result.sourceType == 'video';
+    final title = result.title.trim();
+    final transcript = result.transcript.trim();
+    final hasPageRange = result.pageStart != null || result.pageEnd != null;
+    final pageLabel = result.pageStart == null
+        ? (_isKhmer ? 'ទំព័រ ${result.pageEnd}' : 'Page ${result.pageEnd}')
+        : result.pageEnd == null || result.pageEnd == result.pageStart
+        ? (_isKhmer ? 'ទំព័រ ${result.pageStart}' : 'Page ${result.pageStart}')
+        : (_isKhmer
+              ? 'ទំព័រ ${result.pageStart}–${result.pageEnd}'
+              : 'Pages ${result.pageStart}–${result.pageEnd}');
+    final segmentText = [if (transcript.isNotEmpty) transcript];
+
     return SafeArea(
       child: FractionallySizedBox(
         heightFactor: 0.9,
         child: Material(
           color: Theme.of(context).scaffoldBackgroundColor,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          child: FutureBuilder<KnowledgeDocument>(
-            future: document,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return _MessageView(
-                  message: _isKhmer
-                      ? 'មិនអាចផ្ទុកព័ត៌មានលម្អិតបានទេ។ សូមព្យាយាមម្តងទៀត។'
-                      : 'Could not load document details: ${snapshot.error}',
-                );
-              }
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              final knowledge = snapshot.data!;
-              final source = knowledge.sources.isEmpty
-                  ? null
-                  : knowledge.sources.firstWhere(
-                      (item) => item.fileUrl == result.fileUrl,
-                      orElse: () => knowledge.sources.first,
-                    );
-
-              // match the segment by its id (the search result has no reliable index)
-              final matchingSegments = knowledge.segments.where(
-                (item) => item.id == result.segmentId,
-              );
-              final segment = matchingSegments.isEmpty
-                  ? null
-                  : matchingSegments.first;
-              final url = source?.fileUrl ?? result.fileUrl;
-
-              final title = segment?.title.isNotEmpty == true
-                  ? segment!.title
-                  : result.title;
-              final summary = segment?.summary.isNotEmpty == true
-                  ? segment!.summary
-                  : result.summary;
-              final transcript = segment?.transcript.isNotEmpty == true
-                  ? segment!.transcript
-                  : result.transcript;
-              final pageStart = segment?.pageStart ?? result.pageStart;
-
-              return ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  Text(
-                    knowledge.title,
-                    style: _detailTextStyle(
-                      Theme.of(context).textTheme.headlineSmall,
-                      bold: true,
-                    ),
-                  ),
-                  if (knowledge.description.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      knowledge.description,
-                      style: _detailTextStyle(null, bold: false),
-                    ),
-                  ],
-                  const SizedBox(height: 18),
-                  Text(
-                    title,
-                    style: _detailTextStyle(
-                      Theme.of(context).textTheme.titleLarge,
-                      bold: true,
-                    ),
-                  ),
-                  if (summary.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(summary, style: _detailTextStyle(null, bold: false)),
-                  ],
-                  if (transcript.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      transcript,
-                      style: _detailTextStyle(null, bold: false),
-                    ),
-                  ],
-                  const SizedBox(height: 18),
-                  if (knowledge.sourceType == 'video' && url != null)
-                    _InlineVideo(
-                      startSeconds:
-                          segment?.startTimeSeconds ?? result.startTimeSeconds,
-                      endSeconds:
-                          segment?.endTimeSeconds ?? result.endTimeSeconds,
-                      languageCode: languageCode,
-                      child: _VideoPlayer(
-                        url: url,
-                        startSeconds:
-                            segment?.startTimeSeconds ??
-                            result.startTimeSeconds,
-                        endSeconds:
-                            segment?.endTimeSeconds ?? result.endTimeSeconds,
-                      ),
-                    )
-                  else if (url != null)
-                    FilledButton.icon(
-                      onPressed: () => _openFile(url, pageStart),
-                      icon: const Icon(Icons.picture_as_pdf_outlined),
-                      label: Text(
-                        _isKhmer
-                            ? pageStart == null
-                                  ? 'បើកឯកសារ'
-                                  : 'បើកឯកសារនៅទំព័រ $pageStart'
-                            : pageStart == null
-                            ? 'Open document'
-                            : 'Open document at page $pageStart',
-                        style: TextStyle(
-                          fontFamily: _isKhmer
-                              ? AppTextStyles.khmerFontFamily
-                              : null,
-                          fontVariations: _isKhmer
-                              ? AppTextStyles.khmerBoldFontVariations
-                              : null,
-                          fontWeight: _isKhmer ? FontWeight.w600 : null,
-                        ),
-                      ),
-                    ),
-                  if (url == null)
-                    Text(
-                      _isKhmer
-                          ? 'ឯកសារនេះមិនមានតំណភ្ជាប់ទេ។'
-                          : 'This document does not have a file URL.',
-                      style: _detailTextStyle(null, bold: false),
-                    ),
-                  const SizedBox(height: 12),
-                  Text(
-                    _isKhmer
-                        ? 'កម្រិតភាពត្រូវគ្នា៖ ${(result.score * 100).toStringAsFixed(1)}%'
-                        : 'Match score: ${(result.score * 100).toStringAsFixed(1)}%',
-                    style: _detailTextStyle(
-                      Theme.of(context).textTheme.bodySmall,
-                      bold: false,
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
+          child: isVideo
+              ? _videoView(context)
+              : _textView(
+                  context,
+                  title,
+                  segmentText,
+                  hasPageRange ? pageLabel : null,
+                ),
         ),
       ),
     );
   }
 
-  Future<void> _openFile(String url, int? pageStart) async {
-    final fileUri = Uri.parse(url);
-    final uri = pageStart == null
-        ? fileUri
-        : fileUri.replace(fragment: 'page=$pageStart');
-    try {
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (!launched) {
-        Get.snackbar('Unable to open file', 'Check the file URL.');
-      }
-    } catch (error) {
-      Get.snackbar('Unable to open file', error.toString());
-    }
-  }
-}
-
-class _InlineVideo extends StatelessWidget {
-  final double? startSeconds;
-  final double? endSeconds;
-  final String languageCode;
-  final Widget child;
-
-  const _InlineVideo({
-    required this.startSeconds,
-    required this.endSeconds,
-    required this.languageCode,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isKhmer = languageCode == 'km';
-    final start = _formatSeconds(startSeconds);
-    final end = _formatSeconds(endSeconds);
+  Widget _videoView(BuildContext context) {
+    final url = result.fileUrl;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          isKhmer
-              ? 'ចាប់ផ្តើម៖ $start វិនាទី · បញ្ចប់៖ $end វិនាទី'
-              : 'Start: $start sec · End: $end sec',
+        Align(
+          alignment: Alignment.centerRight,
+          child: IconButton(
+            tooltip: _isKhmer ? 'បិទ' : 'Close',
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(Icons.close),
+          ),
         ),
-        const SizedBox(height: 12),
-        child,
+        Expanded(
+          child: Center(
+            child: url == null
+                ? Text(
+                    _isKhmer
+                        ? 'វីដេអូនេះមិនមានតំណភ្ជាប់ទេ។'
+                        : 'This video does not have a file URL.',
+                    textAlign: TextAlign.center,
+                  )
+                : _VideoPlayer(
+                    url: url,
+                    startSeconds: result.startTimeSeconds,
+                    endSeconds: result.endTimeSeconds,
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _textView(
+    BuildContext context,
+    String title,
+    List<String> segmentText,
+    String? pageLabel,
+  ) {
+    return Column(
+      children: [
+        Align(
+          alignment: Alignment.centerRight,
+          child: IconButton(
+            tooltip: _isKhmer ? 'បិទ' : 'Close',
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(Icons.close),
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            children: [
+              if (title.isNotEmpty)
+                Text(
+                  title,
+                  style: _detailTextStyle(
+                    Theme.of(context).textTheme.titleLarge,
+                    bold: true,
+                  ),
+                ),
+              if (pageLabel != null) ...[
+                if (title.isNotEmpty) const SizedBox(height: 8),
+                Text(
+                  pageLabel,
+                  style: _detailTextStyle(
+                    Theme.of(context).textTheme.bodySmall,
+                    bold: false,
+                  ),
+                ),
+              ],
+              if (segmentText.isNotEmpty) ...[
+                if (title.isNotEmpty || pageLabel != null)
+                  const SizedBox(height: 12),
+                for (var index = 0; index < segmentText.length; index++) ...[
+                  if (index > 0) const SizedBox(height: 12),
+                  Text(
+                    segmentText[index],
+                    style: _detailTextStyle(null, bold: false),
+                  ),
+                ],
+              ],
+              if (segmentText.isEmpty)
+                Text(
+                  pageLabel != null
+                      ? _isKhmer
+                            ? 'មិនមានអត្ថបទសម្រាប់ទំព័រនេះទេ។'
+                            : 'No text is available for this page.'
+                      : _isKhmer
+                      ? 'មិនមានអត្ថបទសម្រាប់ផ្នែកនេះទេ។'
+                      : 'No text is available for this segment.',
+                  style: _detailTextStyle(null, bold: false),
+                ),
+            ],
+          ),
+        ),
       ],
     );
   }
 }
-
-String _formatSeconds(double? seconds) =>
-    seconds == null ? '—' : seconds.toStringAsFixed(1);
 
 class _VideoPlayer extends StatefulWidget {
   final String url;
@@ -287,7 +209,9 @@ class _VideoPlayerState extends State<_VideoPlayer> {
   Future<void> _initialize() async {
     try {
       await _controller.initialize();
-      await _controller.seekTo(_effectiveStart);
+      if (_effectiveStart > Duration.zero) {
+        await _controller.seekTo(_effectiveStart);
+      }
       if (!mounted) return;
       setState(() {});
       await _controller.play();
@@ -395,15 +319,4 @@ class _VideoPlayerState extends State<_VideoPlayer> {
       ],
     );
   }
-}
-
-class _MessageView extends StatelessWidget {
-  final String message;
-
-  const _MessageView({required this.message});
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(padding: const EdgeInsets.all(24), child: Text(message)),
-  );
 }

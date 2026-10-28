@@ -24,11 +24,18 @@ class ChatMessage {
 
   bool get isUser => sender == Sender.user;
 
-  factory ChatMessage.user(String text, {String? original}) => ChatMessage(
+  String get displayText => isUser ? original ?? text : text;
+
+  factory ChatMessage.user(
+    String text, {
+    String? original,
+    String responseLanguage = 'en',
+  }) => ChatMessage(
     id: DateTime.now().microsecondsSinceEpoch.toString(),
     text: text,
     sender: Sender.user,
     original: original,
+    responseLanguage: responseLanguage,
   );
 
   factory ChatMessage.bot(
